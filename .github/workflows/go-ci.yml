@@ -9,6 +9,7 @@ permissions:
 
 jobs:
   test:
+    name: Go test and vet
     runs-on: ubuntu-latest
     services:
       postgres:

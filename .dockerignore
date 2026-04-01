@@ -1,0 +1,9 @@
+.git
+.github
+.vscode
+tmp
+testdata
+booky.exe
+cmd/booky/tmp
+docker-compose.yml
+*.md

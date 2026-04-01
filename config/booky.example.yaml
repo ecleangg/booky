@@ -1,0 +1,145 @@
+# Basic app identity and timezone handling.
+# The timezone controls accounting dates and filing scheduling.
+app:
+  env: dev
+  timezone: Europe/Stockholm
+
+# Public HTTP server settings.
+http:
+  listen_addr: ":8080"
+  read_timeout: 15s
+  write_timeout: 30s
+  idle_timeout: 60s
+
+# Protected admin endpoints for manual runs and operational checks.
+# Keep this enabled in development and protect it with a real token in production.
+admin:
+  enabled: true
+  bearer_token: ${BOOKY_ADMIN_TOKEN}
+
+# PostgreSQL is used for Stripe events, accounting facts, posting state, and filing state.
+postgres:
+  dsn: postgresql://booky:booky@localhost:5432/booky?sslmode=disable
+
+# Stripe credentials and webhook verification.
+# `account_id` can stay empty unless you need to pin the connected Stripe account explicitly.
+stripe:
+  api_key: ${STRIPE_API_KEY}
+  webhook_secret: ${STRIPE_WEBHOOK_SECRET}
+  account_id: ""
+  api_base_url: https://api.stripe.com
+
+# Bokio company and API token used for journal creation and attachments.
+bokio:
+  company_id: 00000000-0000-0000-0000-000000000000
+  token: ${BOKIO_TOKEN}
+  base_url: https://api.bokio.se/v1
+
+# Controls when Stripe activity is turned into Bokio journals.
+# Leave the scheduler disabled until the environment has been verified end to end.
+posting:
+  # End of accounting day in local time.
+  cutoff_time: "23:59"
+  # When true, daily close runs automatically on schedule.
+  scheduler_enabled: false
+  scheduler_poll_interval: 5m
+  # When false, unclear cases stay in review instead of being auto-booked to OBS.
+  auto_post_unknown_to_obs: false
+  # Small balancing tolerance in ore for rounding differences.
+  rounding_tolerance_ore: 2
+
+# Optional email notifications through Resend.
+# Used for accounting warnings/errors and filing draft delivery.
+notifications:
+  resend:
+    enabled: false
+    api_key: ${RESEND_API_KEY}
+    from: bookkeeping@example.com
+    to:
+      - finance@example.com
+    base_url: https://api.resend.com
+    subject_prefix: "[booky]"
+
+# Optional filing generation for Skatteverket.
+# Draft files are emailed to `email_to` ahead of the relevant deadline.
+filings:
+  enabled: false
+  # How many days before the deadline the first filing draft or reminder should be sent.
+  lead_time_days: 7
+  # Local time when the draft/reminder should be sent on that day.
+  send_time_local: "09:00"
+  email_to:
+    - finance@example.com
+
+  # OSS Union export settings for Skatteverket.
+  oss_union:
+    enabled: true
+    identifier_number: ${OSS_IDENTIFIER_NUMBER}
+    origin_country: SE
+    # `reminder_only` means send a reminder when no OSS-ready sales exist instead of generating a zero-value file.
+    zero_sales_policy: reminder_only
+
+  # Periodisk sammanstallning export settings for Skatteverket.
+  periodic_summary:
+    enabled: true
+    cadence: monthly
+    reporting_vat_number: ${PERIODIC_SUMMARY_VAT_NUMBER}
+    responsible_name: eclean Finance
+    responsible_phone: "+46701234567"
+    responsible_email: finance@eclean.gg
+
+  # Exchange-rate sources used when filing output needs FX conversion.
+  fx:
+    oss_provider: ecb_period_end
+    ps_provider: riksbank_monthly_average
+    ecb_base_url: https://www.ecb.europa.eu
+    riksbank_base_url: https://api.riksbank.se
+
+# Bokio account mappings.
+# These are the most important values to review before going live.
+accounts:
+  # Stripe receivable / clearing account for successful payments waiting to be paid out.
+  stripe_receivable: 1580
+  # Bank account used when Stripe payouts land in your real bank.
+  bank: 1920
+  # Account used for customer disputes / contested amounts.
+  dispute: 1510
+  # Fallback OBS account for cases that cannot be booked safely.
+  fallback_obs: 2999
+  # Ore rounding account for small balancing differences.
+  rounding: 3740
+
+  # One Stripe balance account per currency you keep funds in.
+  stripe_balance_by_currency:
+    SEK: 1980
+    EUR: 1981
+    USD: 1982
+
+  # Stripe fee booking, including reverse-charge VAT handling.
+  stripe_fees:
+    expense: 4535
+    input_vat: 2645
+    output_vat: 2614
+
+  # Revenue and VAT accounts by market.
+  # Add the markets you actually sell to.
+  sales_by_market:
+    SE:
+      revenue: 3001
+      output_vat: 2611
+      vat_rate_percent: 25
+    BE:
+      revenue: 3105
+      output_vat: 2614
+      vat_rate_percent: 21
+    EU_B2B:
+      revenue: 3308
+    EXPORT:
+      revenue: 3305
+
+  # Optional fallback for supported "other countries" handling.
+  # Leave this out if you prefer unknown cross-border cases to stay in review.
+  other_countries_default:
+    revenue: 3100
+    output_vat: 2614
+    vat_rate_percent: 25

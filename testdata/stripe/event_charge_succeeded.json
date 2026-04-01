@@ -1,0 +1,14 @@
+{
+  "id": "evt_123",
+  "type": "charge.succeeded",
+  "api_version": "2025-01-27.acacia",
+  "created": 1775068800,
+  "livemode": false,
+  "account": "acct_123",
+  "data": {
+    "object": {
+      "id": "ch_123",
+      "object": "charge"
+    }
+  }
+}

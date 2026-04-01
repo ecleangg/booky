@@ -1,0 +1,29 @@
+version: 2
+
+updates:
+  - package-ecosystem: docker
+    directory: "/"
+    labels:
+      - "dependencies"
+      - "docker"
+    schedule:
+      interval: "weekly"
+    target-branch: "main"
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    schedule:
+      interval: "weekly"
+    target-branch: "main"
+
+  - package-ecosystem: gomod
+    directory: "/"
+    labels:
+      - "dependencies"
+      - "go"
+    schedule:
+      interval: "weekly"
+    target-branch: "main"

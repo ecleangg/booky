@@ -1,0 +1,11 @@
+{
+  "id": "ch_123",
+  "amount": 11900,
+  "currency": "eur",
+  "created": 1775068800,
+  "balance_transaction": "bt_123",
+  "customer": "cus_123",
+  "metadata": {
+    "sale_category": "services"
+  }
+}

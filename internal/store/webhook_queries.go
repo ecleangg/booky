@@ -32,13 +32,17 @@ func (q *Queries) GetWebhookEvent(ctx context.Context, eventID string) (domain.S
 
 	var evt domain.StripeWebhookEvent
 	var payload []byte
+	var apiVersion sql.NullString
 	var processedAt sql.NullTime
 	var processingError sql.NullString
-	if err := row.Scan(&evt.ID, &evt.EventType, &evt.Livemode, &evt.APIVersion, &evt.StripeCreatedAt, &evt.ReceivedAt, &payload, &processedAt, &processingError); err != nil {
+	if err := row.Scan(&evt.ID, &evt.EventType, &evt.Livemode, &apiVersion, &evt.StripeCreatedAt, &evt.ReceivedAt, &payload, &processedAt, &processingError); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return domain.StripeWebhookEvent{}, ErrNotFound
 		}
 		return domain.StripeWebhookEvent{}, fmt.Errorf("get webhook event: %w", err)
+	}
+	if apiVersion.Valid {
+		evt.APIVersion = apiVersion.String
 	}
 	evt.Payload = payload
 	if processedAt.Valid {

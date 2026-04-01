@@ -231,7 +231,7 @@ func TestQueriesFilingLifecycle(t *testing.T) {
 	companyID := testutil.TestConfig().Bokio.CompanyID
 	postingDate := time.Date(2026, 3, 31, 0, 0, 0, 0, time.UTC)
 	period := "2026-Q1"
-	now := time.Date(2026, 4, 10, 9, 0, 0, 0, time.UTC)
+	now := time.Date(2026, 4, 24, 9, 0, 0, 0, time.UTC)
 
 	facts := []domain.AccountingFact{
 		sampleFact(companyID, uuid.New(), "charge:ch_456:sale", "sale_revenue", 3001, domain.DirectionCredit, 7900, postingDate),

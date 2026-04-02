@@ -15,6 +15,10 @@ func stripeWebhookHandler(logger *slog.Logger, service *stripe.Service) http.Han
 			methodNotAllowed(w, http.MethodPost)
 			return
 		}
+		if service == nil {
+			writeError(w, http.StatusServiceUnavailable, errors.New("stripe service is not configured"))
+			return
+		}
 
 		payload, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 4<<20))
 		if err != nil {
@@ -26,11 +30,13 @@ func stripeWebhookHandler(logger *slog.Logger, service *stripe.Service) http.Han
 		if err := service.HandleWebhook(r.Context(), payload, signature); err != nil {
 			logger.Error("stripe webhook failed", "error", err)
 			status := http.StatusInternalServerError
-			if errors.Is(err, io.ErrUnexpectedEOF) || isClientError(err) {
-				status = http.StatusBadRequest
-			}
-			if status == http.StatusInternalServerError && (signature == "" || err.Error() == "stripe webhook signature mismatch") {
+			if errors.Is(err, stripe.ErrWebhookSignatureInvalid) ||
+				errors.Is(err, stripe.ErrWebhookSignatureMismatch) ||
+				errors.Is(err, stripe.ErrWebhookSignatureExpired) ||
+				errors.Is(err, stripe.ErrWebhookSignatureInFuture) {
 				status = http.StatusUnauthorized
+			} else if errors.Is(err, stripe.ErrInvalidEvent) || errors.Is(err, io.ErrUnexpectedEOF) || isClientError(err) {
+				status = http.StatusBadRequest
 			}
 			writeError(w, status, err)
 			return

@@ -1,5 +1,7 @@
 package config
 
+import "gopkg.in/yaml.v3"
+
 type FilingsConfig struct {
 	Enabled         bool                         `yaml:"enabled"`
 	LeadTimeDays    int                          `yaml:"lead_time_days"`
@@ -8,6 +10,8 @@ type FilingsConfig struct {
 	OSSUnion        OSSUnionFilingsConfig        `yaml:"oss_union"`
 	PeriodicSummary PeriodicSummaryFilingsConfig `yaml:"periodic_summary"`
 	FX              FilingFXConfig               `yaml:"fx"`
+
+	leadTimeDaysSet bool
 }
 
 type OSSUnionFilingsConfig struct {
@@ -32,4 +36,22 @@ type FilingFXConfig struct {
 	ECBBaseURL      string `yaml:"ecb_base_url"`
 	RiksbankBaseURL string `yaml:"riksbank_base_url"`
 	RiksbankAPIKey  string `yaml:"riksbank_api_key"`
+}
+
+func (c *FilingsConfig) UnmarshalYAML(value *yaml.Node) error {
+	type rawFilingsConfig FilingsConfig
+
+	var raw rawFilingsConfig
+	if err := value.Decode(&raw); err != nil {
+		return err
+	}
+
+	*c = FilingsConfig(raw)
+	for i := 0; i+1 < len(value.Content); i += 2 {
+		if value.Content[i].Value == "lead_time_days" {
+			c.leadTimeDaysSet = true
+			break
+		}
+	}
+	return nil
 }

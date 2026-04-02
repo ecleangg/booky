@@ -191,7 +191,7 @@ func (s *Service) GetStatus(ctx context.Context, kind, period string) (PeriodSta
 	}
 	if latest, err := s.Repo.Queries().GetLatestFilingExport(ctx, s.Config.Bokio.CompanyID, kind, period); err == nil {
 		status.LatestExport = &latest
-	} else if err != nil && err != store.ErrNotFound {
+	} else if err != nil && !errors.Is(err, store.ErrNotFound) {
 		return PeriodStatus{}, err
 	}
 	return status, nil
@@ -221,7 +221,7 @@ func (s *Service) evaluatePeriod(ctx context.Context, kind, period string, force
 	if current, err := s.Repo.Queries().GetLatestFilingExport(ctx, s.Config.Bokio.CompanyID, kind, period); err == nil {
 		latest = current
 		hasLatest = true
-	} else if err != nil && err != store.ErrNotFound {
+	} else if err != nil && !errors.Is(err, store.ErrNotFound) {
 		return nil, err
 	}
 
@@ -310,9 +310,12 @@ func (s *Service) ensureScheduledPeriods(ctx context.Context, now time.Time) err
 }
 
 func (s *Service) ensurePeriod(ctx context.Context, kind, period string) error {
+	if _, _, err := periodDateRange(kind, period, s.Config); err != nil {
+		return err
+	}
 	if _, err := s.Repo.Queries().GetFilingPeriod(ctx, s.Config.Bokio.CompanyID, kind, period); err == nil {
 		return nil
-	} else if err != store.ErrNotFound {
+	} else if !errors.Is(err, store.ErrNotFound) {
 		return err
 	}
 	return s.Repo.InTx(ctx, func(q *store.Queries) error {

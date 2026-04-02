@@ -22,6 +22,12 @@ func TestGeneratorRenderProducesPDF(t *testing.T) {
 	if !bytes.HasPrefix(data, []byte("%PDF")) {
 		t.Fatalf("expected PDF header, got %q", string(data[:4]))
 	}
+	if !bytes.Contains(data, []byte("charge:ch_123")) {
+		t.Fatalf("expected PDF to include source object reference")
+	}
+	if !bytes.Contains(data, []byte("Tax cases")) || !bytes.Contains(data, []byte("Reportability")) {
+		t.Fatalf("expected PDF tax cases table headers")
+	}
 }
 
 func TestGeneratorRenderHandlesLargeFactTable(t *testing.T) {
@@ -96,6 +102,21 @@ func sampleDraft(factCount int) domain.JournalDraft {
 			{Account: 3001, Credit: 10},
 		},
 		Facts: facts,
+		TaxCases: []domain.TaxCase{
+			{
+				ID:                 uuid.New(),
+				RootObjectType:     "invoice",
+				RootObjectID:       "in_123",
+				ReportabilityState: domain.Reportable,
+				TaxStatus:          strPtr("EU_DE_B2C"),
+				Country:            strPtr("DE"),
+				CountrySource:      strPtr("invoice.customer_address"),
+				SaleType:           strPtr("SERVICES"),
+				BuyerVATNumber:     strPtr("DE123456789"),
+				BuyerVATVerified:   true,
+				InvoicePDFURL:      strPtr("https://example.com/invoice.pdf"),
+			},
+		},
 		Summary: map[string]any{
 			"fact_count":          factCount,
 			"journal_checksum":    "checksum",

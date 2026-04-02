@@ -18,6 +18,7 @@ func NewGenerator() *Generator {
 
 func (g *Generator) Render(draft domain.JournalDraft) ([]byte, error) {
 	p := gofpdf.New("L", "mm", "A4", "")
+	p.SetCompression(false)
 	p.SetMargins(10, 10, 10)
 	p.SetAutoPageBreak(true, 10)
 	p.AddPage()
@@ -63,6 +64,12 @@ func (g *Generator) Render(draft domain.JournalDraft) ([]byte, error) {
 	p.SetFont("Arial", "B", 11)
 	writeLine(p, "Included facts")
 	renderFactsTable(p, draft.Facts)
+	if len(draft.TaxCases) > 0 {
+		p.Ln(4)
+		p.SetFont("Arial", "B", 11)
+		writeLine(p, "Tax cases")
+		renderTaxCasesTable(p, draft.TaxCases)
+	}
 
 	var buf bytes.Buffer
 	if err := p.Output(&buf); err != nil {
@@ -73,4 +80,40 @@ func (g *Generator) Render(draft domain.JournalDraft) ([]byte, error) {
 
 func writeLine(p *gofpdf.Fpdf, text string) {
 	p.CellFormat(0, 5, text, "", 1, "", false, 0, "")
+}
+
+func renderTaxCasesTable(p *gofpdf.Fpdf, cases []domain.TaxCase) {
+	headers := []string{"Case", "Root", "Status", "Reportability", "Country", "Country Src", "Sale Type", "Buyer VAT", "VAT Verified", "Invoice PDF", "Review"}
+	widths := []float64{34, 44, 22, 24, 14, 28, 18, 28, 16, 38, 33}
+	lineHeight := 3.8
+
+	drawFactsHeader(p, headers, widths, lineHeight)
+	p.SetFont("Arial", "", 7)
+	for _, taxCase := range cases {
+		status := valueOrEmpty(taxCase.TaxStatus)
+		if status == "" {
+			status = "UNKNOWN"
+		}
+		cells := []string{
+			taxCase.ID.String(),
+			taxCase.RootObjectType + ":" + taxCase.RootObjectID,
+			status,
+			taxCase.ReportabilityState,
+			valueOrEmpty(taxCase.Country),
+			valueOrEmpty(taxCase.CountrySource),
+			valueOrEmpty(taxCase.SaleType),
+			valueOrEmpty(taxCase.BuyerVATNumber),
+			formatBool(taxCase.BuyerVATVerified),
+			valueOrEmpty(taxCase.InvoicePDFURL),
+			valueOrEmpty(taxCase.ReviewReason),
+		}
+		renderWrappedRow(p, headers, widths, cells, lineHeight)
+	}
+}
+
+func formatBool(value bool) string {
+	if value {
+		return "true"
+	}
+	return ""
 }

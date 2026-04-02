@@ -107,12 +107,21 @@ func (s *Service) RunDailyClose(ctx context.Context, postingDate time.Time) erro
 		return fmt.Errorf("checksum journal evidence: %w", err)
 	}
 	summary["journal_checksum"] = checksum
+	taxCaseIDs := collectTaxCaseIDs(facts)
+	taxCases, err := s.Repo.Queries().ListTaxCasesByIDs(ctx, taxCaseIDs)
+	if err != nil {
+		_ = s.failRun(ctx, run.ID, err)
+		s.notifyFailure(ctx, postingDate, err, facts)
+		return err
+	}
+	summary["tax_case_count"] = len(taxCases)
 	draft := domain.JournalDraft{
 		Title:       title,
 		Date:        postingDate,
 		GeneratedAt: run.StartedAt,
 		Items:       items,
 		Facts:       facts,
+		TaxCases:    taxCases,
 		Summary:     summary,
 		PostingRun:  run,
 		Description: fmt.Sprintf("Stripe dagsverifikat %s underlag", postingDate.Format("2006-01-02")),
@@ -186,6 +195,22 @@ func (s *Service) RunDailyClose(ctx context.Context, postingDate time.Time) erro
 
 	s.Logger.InfoContext(ctx, "daily close completed", "posting_date", postingDate.Format("2006-01-02"), "journal_entry_id", journalResp.ID)
 	return nil
+}
+
+func collectTaxCaseIDs(facts []domain.AccountingFact) []uuid.UUID {
+	set := map[uuid.UUID]struct{}{}
+	for _, fact := range facts {
+		if fact.TaxCaseID == nil {
+			continue
+		}
+		set[*fact.TaxCaseID] = struct{}{}
+	}
+	out := make([]uuid.UUID, 0, len(set))
+	for id := range set {
+		out = append(out, id)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].String() < out[j].String() })
+	return out
 }
 
 func (s *Service) ensurePostingRun(ctx context.Context, proposed domain.PostingRun) (domain.PostingRun, error) {

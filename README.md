@@ -196,8 +196,127 @@ Before sending real traffic to `booky`, confirm:
 - `POST /admin/runs/daily-close?date=YYYY-MM-DD` to post one accounting day to Bokio
 - `POST /admin/runs/filing?kind=...&period=...` to run a filing export
 - `GET /admin/filings?kind=...&period=...` to inspect filing status
+- `POST /admin/filings/mark-submitted?kind=...&period=...` to stop reminders after submission
+- `GET /admin/bokio/check` to verify Bokio connectivity and configuration
 
 Admin endpoints require the configured bearer token when `admin.enabled` is turned on.
+
+### Endpoint query parameter examples
+
+#### `GET /healthz`
+
+No query parameters.
+
+```bash
+curl "http://localhost:8080/healthz"
+```
+
+#### `POST /webhooks/stripe`
+
+No query parameters. Stripe sends the payload in the request body and the signature in the `Stripe-Signature` header.
+
+```bash
+curl -X POST \
+  -H "Content-Type: application/json" \
+  -H "Stripe-Signature: $STRIPE_SIGNATURE" \
+  --data @event.json \
+  "http://localhost:8080/webhooks/stripe"
+```
+
+#### `POST /admin/runs/daily-close`
+
+Query parameters:
+
+- `date` optional, format `YYYY-MM-DD`
+
+If `date` is omitted, `booky` uses the current date in the configured local timezone.
+
+```bash
+curl -X POST \
+  -H "Authorization: Bearer $BOOKY_ADMIN_TOKEN" \
+  "http://localhost:8080/admin/runs/daily-close"
+```
+
+```bash
+curl -X POST \
+  -H "Authorization: Bearer $BOOKY_ADMIN_TOKEN" \
+  "http://localhost:8080/admin/runs/daily-close?date=2026-03-31"
+```
+
+#### `POST /admin/runs/filing`
+
+Query parameters:
+
+- `kind` required, for example `oss_union` or `periodic_summary`
+- `period` required
+
+Example period formats used by the service:
+
+- OSS Union quarter: `2026-Q1`
+- Periodisk sammanstallning month: `2026-03`
+
+```bash
+curl -X POST \
+  -H "Authorization: Bearer $BOOKY_ADMIN_TOKEN" \
+  "http://localhost:8080/admin/runs/filing?kind=oss_union&period=2026-Q1"
+```
+
+```bash
+curl -X POST \
+  -H "Authorization: Bearer $BOOKY_ADMIN_TOKEN" \
+  "http://localhost:8080/admin/runs/filing?kind=periodic_summary&period=2026-03"
+```
+
+#### `GET /admin/filings`
+
+Query parameters:
+
+- `kind` required
+- `period` required
+
+```bash
+curl \
+  -H "Authorization: Bearer $BOOKY_ADMIN_TOKEN" \
+  "http://localhost:8080/admin/filings?kind=oss_union&period=2026-Q1"
+```
+
+```bash
+curl \
+  -H "Authorization: Bearer $BOOKY_ADMIN_TOKEN" \
+  "http://localhost:8080/admin/filings?kind=periodic_summary&period=2026-03"
+```
+
+#### `POST /admin/filings/mark-submitted`
+
+Query parameters:
+
+- `kind` required
+- `period` required
+- `submitted_at` optional, must be RFC3339 like `2026-04-02T09:15:00Z`
+
+If `submitted_at` is omitted, `booky` uses the current time.
+
+```bash
+curl -X POST \
+  -H "Authorization: Bearer $BOOKY_ADMIN_TOKEN" \
+  "http://localhost:8080/admin/filings/mark-submitted?kind=oss_union&period=2026-Q1"
+```
+
+```bash
+curl -X POST \
+  -H "Authorization: Bearer $BOOKY_ADMIN_TOKEN" \
+  "http://localhost:8080/admin/filings/mark-submitted?kind=periodic_summary&period=2026-03&submitted_at=2026-04-02T09:15:00Z"
+```
+
+#### `GET /admin/bokio/check`
+
+No query parameters.
+
+```bash
+curl \
+  -H "Authorization: Bearer $BOOKY_ADMIN_TOKEN" \
+  "http://localhost:8080/admin/bokio/check"
+```
 
 ## Filings for Skatteverket
 

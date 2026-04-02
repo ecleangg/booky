@@ -1,6 +1,8 @@
 package config
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -134,5 +136,73 @@ func TestValidateRejectsEnabledAdminWithoutToken(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "admin.bearer_token is required") {
 		t.Fatalf("unexpected validation error: %v", err)
+	}
+}
+
+func TestLoadPreservesExplicitZeroLeadTimeDays(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "booky.yaml")
+	if err := os.WriteFile(path, []byte(`
+postgres:
+  dsn: postgres://example
+stripe:
+  api_key: sk_test
+  webhook_secret: whsec_test
+bokio:
+  company_id: 11111111-1111-1111-1111-111111111111
+  token: bokio-token
+accounts:
+  stripe_receivable: 1580
+  bank: 1920
+  dispute: 1510
+  fallback_obs: 2999
+  rounding: 3740
+  stripe_balance_by_currency:
+    SEK: 1980
+  stripe_fees:
+    expense: 4535
+    input_vat: 2645
+    output_vat: 2614
+  sales_by_market:
+    SE:
+      revenue: 3001
+      output_vat: 2611
+      vat_rate_percent: 25
+filings:
+  enabled: true
+  lead_time_days: 0
+  send_time_local: "09:00"
+  email_to:
+    - finance@example.com
+  oss_union:
+    enabled: true
+    identifier_number: SE556000016701
+    origin_country: SE
+    zero_sales_policy: reminder_only
+  periodic_summary:
+    enabled: true
+    cadence: monthly
+    reporting_vat_number: SE556000016701
+    responsible_name: eclean Finance
+    responsible_phone: "+46701234567"
+    responsible_email: finance@eclean.gg
+notifications:
+  resend:
+    enabled: true
+    api_key: re_test
+    from: bookkeeping@example.com
+    to:
+      - finance@example.com
+    base_url: https://api.resend.com
+`), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+	if cfg.Filings.LeadTimeDays != 0 {
+		t.Fatalf("expected explicit lead_time_days=0 to be preserved, got %d", cfg.Filings.LeadTimeDays)
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -15,6 +16,14 @@ import (
 	"strconv"
 	"strings"
 	"time"
+)
+
+var (
+	ErrWebhookSignatureInvalid  = errors.New("invalid stripe webhook signature")
+	ErrWebhookSignatureMismatch = errors.New("stripe webhook signature mismatch")
+	ErrWebhookSignatureExpired  = errors.New("stripe webhook signature expired")
+	ErrWebhookSignatureInFuture = errors.New("stripe webhook signature timestamp is too far in the future")
+	ErrInvalidEvent             = errors.New("invalid stripe event payload")
 )
 
 func (c *Client) VerifyWebhook(payload []byte, signatureHeader string) error {
@@ -25,8 +34,11 @@ func (c *Client) VerifyWebhook(payload []byte, signatureHeader string) error {
 	if err != nil {
 		return err
 	}
-	if time.Since(time.Unix(timestamp, 0)) > 5*time.Minute {
-		return fmt.Errorf("stripe webhook signature is too old")
+	signedAt := time.Unix(timestamp, 0)
+	if age := time.Since(signedAt); age > 5*time.Minute {
+		return ErrWebhookSignatureExpired
+	} else if age < -5*time.Minute {
+		return ErrWebhookSignatureInFuture
 	}
 	signedPayload := fmt.Sprintf("%d.%s", timestamp, payload)
 	h := hmac.New(sha256.New, []byte(c.webhookSecret))
@@ -37,7 +49,7 @@ func (c *Client) VerifyWebhook(payload []byte, signatureHeader string) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("stripe webhook signature mismatch")
+	return ErrWebhookSignatureMismatch
 }
 
 func (c *Client) ParseEvent(payload []byte) (Event, error) {
@@ -46,7 +58,7 @@ func (c *Client) ParseEvent(payload []byte) (Event, error) {
 		return Event{}, fmt.Errorf("decode stripe event: %w", err)
 	}
 	if evt.ID == "" || evt.Type == "" {
-		return Event{}, fmt.Errorf("stripe event missing id or type")
+		return Event{}, fmt.Errorf("%w: missing id or type", ErrInvalidEvent)
 	}
 	return evt, nil
 }
@@ -183,7 +195,7 @@ func parseStripeSignature(header string) (int64, []string, error) {
 		}
 	}
 	if timestamp == 0 || len(signatures) == 0 {
-		return 0, nil, fmt.Errorf("invalid stripe signature header")
+		return 0, nil, ErrWebhookSignatureInvalid
 	}
 	return timestamp, signatures, nil
 }

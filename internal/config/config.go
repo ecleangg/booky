@@ -169,7 +169,7 @@ func setDefaults(cfg *Config) {
 	if cfg.Notifications.Resend.SubjectPrefix == "" {
 		cfg.Notifications.Resend.SubjectPrefix = "[booky]"
 	}
-	if cfg.Filings.LeadTimeDays == 0 {
+	if cfg.Filings.LeadTimeDays == 0 && !cfg.Filings.leadTimeDaysSet {
 		cfg.Filings.LeadTimeDays = 7
 	}
 	if cfg.Filings.SendTimeLocal == "" {

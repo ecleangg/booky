@@ -73,5 +73,6 @@ func writeError(w http.ResponseWriter, status int, err error) {
 
 func isClientError(err error) bool {
 	var syntaxError *json.SyntaxError
-	return errors.As(err, &syntaxError)
+	var typeError *json.UnmarshalTypeError
+	return errors.As(err, &syntaxError) || errors.As(err, &typeError)
 }

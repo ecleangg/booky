@@ -6,8 +6,84 @@ import (
 	"strings"
 
 	"github.com/ecleangg/booky/internal/config"
+	"github.com/ecleangg/booky/internal/domain"
 	"github.com/ecleangg/booky/internal/support"
 )
+
+func ResolveTaxCase(cfg config.Config, taxCase domain.TaxCase, grossSEKOre int64, explicitVATSEKOre *int64) SalesResolution {
+	if taxCase.TaxStatus == nil || strings.TrimSpace(*taxCase.TaxStatus) == "" {
+		reason := "tax case is missing final tax status"
+		if taxCase.ReviewReason != nil && strings.TrimSpace(*taxCase.ReviewReason) != "" {
+			reason = strings.TrimSpace(*taxCase.ReviewReason)
+		}
+		return SalesResolution{ReviewReason: reason}
+	}
+	if taxCase.ReportabilityState != domain.Reportable {
+		reason := "tax case requires additional evidence"
+		if taxCase.ReviewReason != nil && strings.TrimSpace(*taxCase.ReviewReason) != "" {
+			reason = strings.TrimSpace(*taxCase.ReviewReason)
+		}
+		return SalesResolution{ReviewReason: reason}
+	}
+
+	marketCode, vatTreatment, err := marketAndTreatmentFromStatus(*taxCase.TaxStatus)
+	if err != nil {
+		return SalesResolution{ReviewReason: err.Error()}
+	}
+	marketCfg, ok := cfg.Accounts.SalesByMarket[marketCode]
+	if !ok && cfg.Accounts.OtherCountriesDefault != nil && shouldUseOtherCountriesDefault(marketCode) {
+		marketCfg = *cfg.Accounts.OtherCountriesDefault
+		ok = true
+	}
+	if !ok {
+		return SalesResolution{ReviewReason: fmt.Sprintf("no sales account mapping for market %s", marketCode)}
+	}
+
+	res := SalesResolution{
+		MarketCode:       marketCode,
+		VATTreatment:     vatTreatment,
+		RevenueAccount:   marketCfg.Revenue,
+		OutputVATAccount: marketCfg.OutputVAT,
+	}
+	if marketCfg.OutputVAT == 0 {
+		res.RevenueSEKOre = grossSEKOre
+		return res
+	}
+	if explicitVATSEKOre != nil {
+		res.VATSEKOre = *explicitVATSEKOre
+		res.RevenueSEKOre = grossSEKOre - *explicitVATSEKOre
+		return res
+	}
+	if marketCfg.VATRatePercent <= 0 {
+		res.ReviewReason = fmt.Sprintf("market %s requires VAT amount or vat_rate_percent", marketCode)
+		return res
+	}
+
+	vat := int64(math.Round(float64(grossSEKOre) * marketCfg.VATRatePercent / (100.0 + marketCfg.VATRatePercent)))
+	res.VATSEKOre = vat
+	res.RevenueSEKOre = grossSEKOre - vat
+	return res
+}
+
+func marketAndTreatmentFromStatus(status string) (string, string, error) {
+	status = strings.TrimSpace(status)
+	switch {
+	case status == domain.TaxStatusSEB2B || status == domain.TaxStatusSEB2C:
+		return "SE", "domestic", nil
+	case status == domain.TaxStatusOutsideEU:
+		return "EXPORT", "export", nil
+	case strings.HasPrefix(status, "EU_") && strings.HasSuffix(status, "_B2B"):
+		return "EU_B2B", "eu_reverse_charge", nil
+	case strings.HasPrefix(status, "EU_") && strings.HasSuffix(status, "_B2C"):
+		parts := strings.Split(status, "_")
+		if len(parts) != 3 || len(parts[1]) != 2 {
+			return "", "", fmt.Errorf("unsupported tax status %q", status)
+		}
+		return parts[1], "eu_oss", nil
+	default:
+		return "", "", fmt.Errorf("unsupported tax status %q", status)
+	}
+}
 
 func ResolveSale(cfg config.Config, input SaleClassificationInput) SalesResolution {
 	country := strings.ToUpper(strings.TrimSpace(input.Country))

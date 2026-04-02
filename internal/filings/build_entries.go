@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"sort"
 	"strings"
 	"time"
@@ -96,6 +95,7 @@ func (s *Service) buildGroupContext(ctx context.Context, facts []domain.Accounti
 	groupFacts := summarizeFacts(facts)
 	rep := groupFacts.Representative
 	entryCtx := &filingContext{
+		TaxCaseID:          rep.TaxCaseID,
 		GroupID:            rep.SourceGroupID,
 		SourceObjectType:   rep.SourceObjectType,
 		SourceObjectID:     rep.SourceObjectID,
@@ -112,75 +112,57 @@ func (s *Service) buildGroupContext(ctx context.Context, facts []domain.Accounti
 		ReviewReason:       groupFacts.ReviewReason,
 	}
 
-	switch rep.SourceObjectType {
-	case "charge":
-		charge, err := decodeCharge(rep.Payload)
-		if err != nil {
-			return nil, err
+	if rep.TaxCaseID == nil {
+		entryCtx.ReviewReason = "accounting facts are missing tax_case_id"
+		return entryCtx, nil
+	}
+	taxCase, err := source.TaxCase(ctx, *rep.TaxCaseID)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			entryCtx.ReviewReason = "tax case is missing"
+			return entryCtx, nil
 		}
-		invoice, customer, err := loadChargeSupport(ctx, source, charge)
-		if err != nil {
-			return nil, err
-		}
-		entryCtx.Charge = &charge
-		entryCtx.Invoice = invoice
-		entryCtx.Customer = customer
-		entryCtx.AllMetadata = support.MergeStringMaps(metadataFromCustomer(customer), metadataFromInvoice(invoice), charge.Metadata)
-		entryCtx.SaleCategory = support.MapString(entryCtx.AllMetadata, "booky_sale_category", "sale_category")
-		entryCtx.BuyerVATNumber = resolveCustomerVATID(entryCtx.AllMetadata, invoice)
-		entryCtx.Country = resolveCountryEvidence(charge, invoice, customer, entryCtx.SaleCategory, entryCtx.AllMetadata)
-		entryCtx.ShippingEvidence = hasShippingEvidence(invoice, customer)
-		entryCtx.AmountSEKOre = groupFacts.GrossSEKOre
-		entryCtx.OriginalSupplyDate = time.Unix(charge.Created, 0).In(support.LocationOrUTC(s.Config))
-	case "refund":
-		refund, err := decodeRefund(rep.Payload)
-		if err != nil {
-			return nil, err
-		}
-		parentRaw, err := source.ParentChargeForRefund(ctx, refund.ID, rep.StripeEventID)
-		if err != nil {
-			return nil, err
-		}
-		charge, err := decodeCharge(parentRaw)
-		if err != nil {
-			return nil, err
-		}
-		invoice, customer, err := loadChargeSupport(ctx, source, charge)
-		if err != nil {
-			return nil, err
-		}
-		entryCtx.Refund = &refund
-		entryCtx.Charge = &charge
-		entryCtx.Invoice = invoice
-		entryCtx.Customer = customer
-		entryCtx.AllMetadata = support.MergeStringMaps(metadataFromCustomer(customer), metadataFromInvoice(invoice), charge.Metadata, refund.Metadata)
-		entryCtx.SaleCategory = support.MapString(entryCtx.AllMetadata, "booky_sale_category", "sale_category")
-		entryCtx.BuyerVATNumber = resolveCustomerVATID(entryCtx.AllMetadata, invoice)
-		entryCtx.Country = resolveCountryEvidence(charge, invoice, customer, entryCtx.SaleCategory, entryCtx.AllMetadata)
-		entryCtx.ShippingEvidence = hasShippingEvidence(invoice, customer)
-		entryCtx.AmountSEKOre = -groupFacts.GrossSEKOre
-		entryCtx.RevenueSEKOre = -groupFacts.RevenueSEKOre
-		entryCtx.VATSEKOre = -groupFacts.VATSEKOre
-		entryCtx.SourceCurrency = strings.ToUpper(refund.Currency)
-		entryCtx.SourceAmountMinor = -refund.Amount
+		return nil, err
+	}
+	entryCtx.TaxStatus = strings.TrimSpace(valueOrEmpty(taxCase.TaxStatus))
+	entryCtx.ReportabilityState = taxCase.ReportabilityState
+	entryCtx.SaleType = strings.TrimSpace(valueOrEmpty(taxCase.SaleType))
+	entryCtx.Country = strings.TrimSpace(valueOrEmpty(taxCase.Country))
+	entryCtx.BuyerVATNumber = strings.TrimSpace(valueOrEmpty(taxCase.BuyerVATNumber))
+	entryCtx.AmountSEKOre = groupFacts.GrossSEKOre
+	if taxCase.SourceCurrency != nil {
+		entryCtx.SourceCurrency = strings.ToUpper(strings.TrimSpace(*taxCase.SourceCurrency))
+	}
+	if taxCase.SourceAmountMinor != nil {
+		entryCtx.SourceAmountMinor = *taxCase.SourceAmountMinor
 		entryCtx.HasSourceAmount = true
-		entryCtx.OriginalSupplyDate = time.Unix(charge.Created, 0).In(support.LocationOrUTC(s.Config))
-	default:
-		return nil, nil
-	}
-
-	if strings.TrimSpace(entryCtx.Country) == "" && len(strings.TrimSpace(entryCtx.MarketCode)) == 2 {
-		entryCtx.Country = strings.ToUpper(strings.TrimSpace(entryCtx.MarketCode))
-	}
-	saleType, reviewReason := resolveSaleType(entryCtx.SaleCategory, entryCtx.ShippingEvidence)
-	entryCtx.SaleType = saleType
-	if entryCtx.ReviewReason == "" && reviewReason != "" {
-		entryCtx.ReviewReason = reviewReason
 	}
 	if entryCtx.ReviewReason == "" {
+		switch rep.SourceObjectType {
+		case "charge":
+			var charge chargePayload
+			if err := json.Unmarshal(rep.Payload, &charge); err == nil && charge.Created > 0 {
+				entryCtx.OriginalSupplyDate = time.Unix(charge.Created, 0).In(support.LocationOrUTC(s.Config))
+			}
+		case "refund":
+			var refund refundPayload
+			if err := json.Unmarshal(rep.Payload, &refund); err == nil {
+				entryCtx.SourceCurrency = strings.ToUpper(refund.Currency)
+				entryCtx.SourceAmountMinor = -refund.Amount
+				entryCtx.HasSourceAmount = true
+			}
+		}
+		if entryCtx.OriginalSupplyDate.IsZero() {
+			entryCtx.OriginalSupplyDate = rep.PostingDate
+		}
 		if reason := filingUnsupportedReason(*entryCtx); reason != "" {
 			entryCtx.ReviewReason = reason
 		}
+	}
+	if rep.SourceObjectType == "refund" {
+		entryCtx.AmountSEKOre = -groupFacts.GrossSEKOre
+		entryCtx.RevenueSEKOre = -groupFacts.RevenueSEKOre
+		entryCtx.VATSEKOre = -groupFacts.VATSEKOre
 	}
 	return entryCtx, nil
 }
@@ -197,14 +179,10 @@ func (s *Service) buildOSSUnionEntry(ctx context.Context, input filingContext) (
 		reviewReason = &reason
 	}
 
-	rate, err := s.Rates.OSSPeriodEndEURSEK(ctx, filingPeriod)
-	if err != nil {
-		return nil, err
-	}
-
 	entry := &domain.OSSUnionEntry{
 		ID:                   uuid.New(),
 		BokioCompanyID:       s.Config.Bokio.CompanyID,
+		TaxCaseID:            input.TaxCaseID,
 		SourceGroupID:        input.GroupID,
 		SourceObjectType:     input.SourceObjectType,
 		SourceObjectID:       input.SourceObjectID,
@@ -215,18 +193,22 @@ func (s *Service) buildOSSUnionEntry(ctx context.Context, input filingContext) (
 		OriginCountry:        strings.ToUpper(strings.TrimSpace(s.Config.Filings.OSSUnion.OriginCountry)),
 		OriginIdentifier:     strings.ToUpper(strings.TrimSpace(s.Config.Filings.OSSUnion.OriginCountry)),
 		SaleType:             input.SaleType,
-		VATRateBasisPoints:   vatRateBasisPoints(input.RevenueSEKOre, input.VATSEKOre),
 		ReviewState:          reviewState,
 		ReviewReason:         reviewReason,
 	}
+	if configuredRate, ok := configuredVATRateBasisPoints(s.Config, entry.ConsumptionCountry); ok {
+		entry.VATRateBasisPoints = configuredRate
+	} else {
+		entry.VATRateBasisPoints = vatRateBasisPoints(input.RevenueSEKOre, input.VATSEKOre)
+	}
 	if reviewState == domain.FilingReviewStateReady {
-		entry.TaxableAmountEURCents = int64(math.Round(float64(input.RevenueSEKOre) / rate.Rate))
-		entry.VATAmountEURCents = int64(math.Round(float64(input.VATSEKOre) / rate.Rate))
+		entry.TaxableAmountEURCents = input.RevenueSEKOre
+		entry.VATAmountEURCents = input.VATSEKOre
 	}
 	if input.SourceObjectType == "refund" && filingPeriod != originalSupplyPeriod {
 		entry.CorrectionTargetPeriod = &originalSupplyPeriod
 	}
-	payload, err := buildEntryPayload(input, rate)
+	payload, err := buildEntryPayload(input)
 	if err != nil {
 		return nil, err
 	}
@@ -260,28 +242,10 @@ func (s *Service) buildPeriodicSummaryEntry(ctx context.Context, input filingCon
 	}
 
 	amountSEKOre := input.AmountSEKOre
-	var rate domain.FXRate
-	if reviewState == domain.FilingReviewStateReady {
-		if strings.ToUpper(strings.TrimSpace(input.SourceCurrency)) == "SEK" {
-			rate = domain.FXRate{
-				Provider:      "identity",
-				BaseCurrency:  "SEK",
-				QuoteCurrency: "SEK",
-				Period:        filingPeriod,
-				Rate:          1,
-			}
-		} else if !input.HasSourceAmount {
-			reason := "periodic summary entry is missing source amount for FX conversion"
-			reviewState = domain.FilingReviewStateReview
-			reviewReason = &reason
-		} else {
-			var err error
-			rate, err = s.Rates.PSMonthlyAverage(ctx, strings.ToUpper(strings.TrimSpace(input.SourceCurrency)), filingPeriod)
-			if err != nil {
-				return nil, err
-			}
-			amountSEKOre = int64(math.Round(float64(input.SourceAmountMinor) * rate.Rate))
-		}
+	if reviewState == domain.FilingReviewStateReady && amountSEKOre == 0 {
+		reason := "periodic summary entry is missing settled SEK amount"
+		reviewState = domain.FilingReviewStateReview
+		reviewReason = &reason
 	}
 	if reviewState == domain.FilingReviewStateReview {
 		amountSEKOre = 0
@@ -290,6 +254,7 @@ func (s *Service) buildPeriodicSummaryEntry(ctx context.Context, input filingCon
 	entry := &domain.PeriodicSummaryEntry{
 		ID:                uuid.New(),
 		BokioCompanyID:    s.Config.Bokio.CompanyID,
+		TaxCaseID:         input.TaxCaseID,
 		SourceGroupID:     input.GroupID,
 		SourceObjectType:  input.SourceObjectType,
 		SourceObjectID:    input.SourceObjectID,
@@ -298,11 +263,11 @@ func (s *Service) buildPeriodicSummaryEntry(ctx context.Context, input filingCon
 		BuyerVATNumber:    strings.ToUpper(strings.TrimSpace(input.BuyerVATNumber)),
 		RowType:           rowType,
 		AmountSEKOre:      amountSEKOre,
-		ExportedAmountSEK: int64(math.Round(float64(amountSEKOre) / 100.0)),
+		ExportedAmountSEK: oreToWholeSEK(amountSEKOre),
 		ReviewState:       reviewState,
 		ReviewReason:      reviewReason,
 	}
-	payload, err := buildEntryPayload(input, rate)
+	payload, err := buildEntryPayload(input)
 	if err != nil {
 		return nil, err
 	}
@@ -315,43 +280,6 @@ func (s *Service) buildPeriodicSummaryEntry(ctx context.Context, input filingCon
 		entry.ExportedAmountSEK = 0
 	}
 	return entry, nil
-}
-
-func loadChargeSupport(ctx context.Context, source entrySource, charge chargePayload) (*invoicePayload, *customerPayload, error) {
-	var invoice *invoicePayload
-	if strings.TrimSpace(charge.Invoice) != "" {
-		raw, err := source.Snapshot(ctx, "invoice", strings.TrimSpace(charge.Invoice))
-		if err != nil && !errors.Is(err, store.ErrNotFound) {
-			return nil, nil, err
-		}
-		if len(raw) > 0 {
-			decoded, err := decodeInvoice(raw)
-			if err != nil {
-				return nil, nil, err
-			}
-			invoice = &decoded
-		}
-	}
-
-	customerID := strings.TrimSpace(charge.Customer)
-	if customerID == "" && invoice != nil {
-		customerID = strings.TrimSpace(invoice.Customer)
-	}
-	var customer *customerPayload
-	if customerID != "" {
-		raw, err := source.Snapshot(ctx, "customer", customerID)
-		if err != nil && !errors.Is(err, store.ErrNotFound) {
-			return nil, nil, err
-		}
-		if len(raw) > 0 {
-			decoded, err := decodeCustomer(raw)
-			if err != nil {
-				return nil, nil, err
-			}
-			customer = &decoded
-		}
-	}
-	return invoice, customer, nil
 }
 
 func summarizeFacts(facts []domain.AccountingFact) filingFacts {
@@ -386,8 +314,11 @@ func summarizeFacts(facts []domain.AccountingFact) filingFacts {
 	return out
 }
 
-func buildEntryPayload(input filingContext, rate domain.FXRate) (json.RawMessage, error) {
+func buildEntryPayload(input filingContext) (json.RawMessage, error) {
 	payload := map[string]any{
+		"tax_case_id":          input.TaxCaseID,
+		"tax_status":           input.TaxStatus,
+		"reportability_state":  input.ReportabilityState,
 		"source_group_id":      input.GroupID,
 		"source_object_type":   input.SourceObjectType,
 		"source_object_id":     input.SourceObjectID,
@@ -404,9 +335,6 @@ func buildEntryPayload(input filingContext, rate domain.FXRate) (json.RawMessage
 		"vat_sek_ore":          input.VATSEKOre,
 		"sale_type":            input.SaleType,
 		"shipping_evidence":    input.ShippingEvidence,
-		"fx_provider":          rate.Provider,
-		"fx_rate":              rate.Rate,
-		"fx_observed_at":       rate.ObservedAt,
 		"original_supply_date": input.OriginalSupplyDate,
 		"filing_posting_date":  input.PostingDate,
 	}
@@ -415,6 +343,13 @@ func buildEntryPayload(input filingContext, rate domain.FXRate) (json.RawMessage
 		return nil, fmt.Errorf("marshal filing payload: %w", err)
 	}
 	return b, nil
+}
+
+func oreToWholeSEK(amount int64) int64 {
+	if amount >= 0 {
+		return (amount + 50) / 100
+	}
+	return -(((-amount) + 50) / 100)
 }
 
 func canEncodeLatin1(value string) bool {

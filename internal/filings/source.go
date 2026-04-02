@@ -2,59 +2,34 @@ package filings
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
-	"strings"
 
 	"github.com/ecleangg/booky/internal/domain"
 	"github.com/ecleangg/booky/internal/store"
+	"github.com/google/uuid"
 )
 
 type entrySource interface {
-	Snapshot(ctx context.Context, objectType, objectID string) (json.RawMessage, error)
-	ParentChargeForRefund(ctx context.Context, refundID string, stripeEventID *string) (json.RawMessage, error)
+	TaxCase(ctx context.Context, id uuid.UUID) (domain.TaxCase, error)
 }
 
 type memorySource struct {
-	snapshots map[string]json.RawMessage
-	charges   []json.RawMessage
+	taxCases map[uuid.UUID]domain.TaxCase
 }
 
-func newMemorySource(snapshots []domain.ObjectSnapshot, _ map[string]json.RawMessage) entrySource {
-	source := &memorySource{
-		snapshots: make(map[string]json.RawMessage, len(snapshots)),
-		charges:   make([]json.RawMessage, 0),
-	}
-	for _, snapshot := range snapshots {
-		source.snapshots[snapshotKey(snapshot.ObjectType, snapshot.ObjectID)] = snapshot.Payload
-		if snapshot.ObjectType == "charge" {
-			source.charges = append(source.charges, snapshot.Payload)
-		}
+func newMemorySource(taxCases []domain.TaxCase) entrySource {
+	source := &memorySource{taxCases: make(map[uuid.UUID]domain.TaxCase, len(taxCases))}
+	for _, taxCase := range taxCases {
+		source.taxCases[taxCase.ID] = taxCase
 	}
 	return source
 }
 
-func (s *memorySource) Snapshot(_ context.Context, objectType, objectID string) (json.RawMessage, error) {
-	raw, ok := s.snapshots[snapshotKey(objectType, objectID)]
+func (s *memorySource) TaxCase(_ context.Context, id uuid.UUID) (domain.TaxCase, error) {
+	out, ok := s.taxCases[id]
 	if !ok {
-		return nil, store.ErrNotFound
+		return domain.TaxCase{}, store.ErrNotFound
 	}
-	return raw, nil
-}
-
-func (s *memorySource) ParentChargeForRefund(_ context.Context, refundID string, _ *string) (json.RawMessage, error) {
-	for _, raw := range s.charges {
-		charge, err := decodeCharge(raw)
-		if err != nil {
-			continue
-		}
-		for _, refund := range charge.Refunds.Data {
-			if refund.ID == refundID {
-				return raw, nil
-			}
-		}
-	}
-	return nil, store.ErrNotFound
+	return out, nil
 }
 
 type repositorySource struct {
@@ -65,34 +40,6 @@ func newRepositorySource(repo *store.Repository) entrySource {
 	return &repositorySource{repo: repo}
 }
 
-func (s *repositorySource) Snapshot(ctx context.Context, objectType, objectID string) (json.RawMessage, error) {
-	snapshot, err := s.repo.Queries().GetObjectSnapshot(ctx, objectType, objectID)
-	if err != nil {
-		return nil, err
-	}
-	return snapshot.Payload, nil
-}
-
-func (s *repositorySource) ParentChargeForRefund(ctx context.Context, refundID string, stripeEventID *string) (json.RawMessage, error) {
-	if stripeEventID == nil || strings.TrimSpace(*stripeEventID) == "" {
-		return nil, store.ErrNotFound
-	}
-	evt, err := s.repo.Queries().GetWebhookEvent(ctx, strings.TrimSpace(*stripeEventID))
-	if err != nil {
-		return nil, err
-	}
-	var envelope stripeEventEnvelope
-	if err := json.Unmarshal(evt.Payload, &envelope); err != nil {
-		return nil, fmt.Errorf("decode webhook event %s: %w", evt.ID, err)
-	}
-	charge, err := decodeCharge(envelope.Data.Object)
-	if err != nil {
-		return nil, err
-	}
-	for _, refund := range charge.Refunds.Data {
-		if refund.ID == refundID {
-			return envelope.Data.Object, nil
-		}
-	}
-	return nil, store.ErrNotFound
+func (s *repositorySource) TaxCase(ctx context.Context, id uuid.UUID) (domain.TaxCase, error) {
+	return s.repo.Queries().GetTaxCase(ctx, id)
 }

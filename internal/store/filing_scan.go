@@ -13,11 +13,13 @@ import (
 
 func scanOSSUnionEntry(row interface{ Scan(dest ...any) error }) (domain.OSSUnionEntry, error) {
 	var entry domain.OSSUnionEntry
+	var taxCaseID uuid.NullUUID
 	var stripeEventID, correctionTargetPeriod, reviewReason sql.NullString
 	var payload []byte
 	if err := row.Scan(
 		&entry.ID,
 		&entry.BokioCompanyID,
+		&taxCaseID,
 		&entry.SourceGroupID,
 		&entry.SourceObjectType,
 		&entry.SourceObjectID,
@@ -40,6 +42,9 @@ func scanOSSUnionEntry(row interface{ Scan(dest ...any) error }) (domain.OSSUnio
 	); err != nil {
 		return domain.OSSUnionEntry{}, fmt.Errorf("scan oss union entry: %w", err)
 	}
+	if taxCaseID.Valid {
+		entry.TaxCaseID = &taxCaseID.UUID
+	}
 	if stripeEventID.Valid {
 		entry.StripeEventID = &stripeEventID.String
 	}
@@ -55,11 +60,13 @@ func scanOSSUnionEntry(row interface{ Scan(dest ...any) error }) (domain.OSSUnio
 
 func scanPeriodicSummaryEntry(row interface{ Scan(dest ...any) error }) (domain.PeriodicSummaryEntry, error) {
 	var entry domain.PeriodicSummaryEntry
+	var taxCaseID uuid.NullUUID
 	var stripeEventID, reviewReason sql.NullString
 	var payload []byte
 	if err := row.Scan(
 		&entry.ID,
 		&entry.BokioCompanyID,
+		&taxCaseID,
 		&entry.SourceGroupID,
 		&entry.SourceObjectType,
 		&entry.SourceObjectID,
@@ -76,6 +83,9 @@ func scanPeriodicSummaryEntry(row interface{ Scan(dest ...any) error }) (domain.
 		&entry.UpdatedAt,
 	); err != nil {
 		return domain.PeriodicSummaryEntry{}, fmt.Errorf("scan periodic summary entry: %w", err)
+	}
+	if taxCaseID.Valid {
+		entry.TaxCaseID = &taxCaseID.UUID
 	}
 	if stripeEventID.Valid {
 		entry.StripeEventID = &stripeEventID.String

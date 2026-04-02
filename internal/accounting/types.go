@@ -9,6 +9,7 @@ import (
 type SaleInput struct {
 	BokioCompanyID             uuid.UUID
 	StripeAccountID            string
+	TaxCaseID                  *uuid.UUID
 	SourceObjectType           string
 	SourceObjectID             string
 	SourceGroupPrefix          string
@@ -40,6 +41,7 @@ type SaleInput struct {
 type RefundInput struct {
 	BokioCompanyID             uuid.UUID
 	StripeAccountID            string
+	TaxCaseID                  *uuid.UUID
 	SourceObjectID             string
 	SourceGroupID              string
 	StripeBalanceTransactionID string
@@ -61,6 +63,7 @@ type RefundInput struct {
 type PayoutInput struct {
 	BokioCompanyID             uuid.UUID
 	StripeAccountID            string
+	TaxCaseID                  *uuid.UUID
 	SourceObjectID             string
 	SourceGroupID              string
 	StripeBalanceTransactionID string
@@ -77,6 +80,7 @@ type PayoutInput struct {
 type DisputeInput struct {
 	BokioCompanyID             uuid.UUID
 	StripeAccountID            string
+	TaxCaseID                  *uuid.UUID
 	SourceObjectID             string
 	SourceGroupID              string
 	StripeBalanceTransactionID string
@@ -93,6 +97,7 @@ type DisputeInput struct {
 type ReviewTransferInput struct {
 	BokioCompanyID             uuid.UUID
 	StripeAccountID            string
+	TaxCaseID                  *uuid.UUID
 	SourceGroupID              string
 	SourceObjectType           string
 	SourceObjectID             string

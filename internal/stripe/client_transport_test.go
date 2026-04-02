@@ -4,8 +4,8 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
-	"errors"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -28,6 +28,70 @@ func TestVerifyWebhookAcceptsFixturePayload(t *testing.T) {
 
 	if err := client.VerifyWebhook(payload, signedHeader(payload, "whsec_test", time.Now().Unix())); err != nil {
 		t.Fatalf("VerifyWebhook returned error: %v", err)
+	}
+}
+
+func TestGetInvoiceExpandsProductFieldsAndAcceptsStringProducts(t *testing.T) {
+	fixture := []byte(`{
+		"id":"in_123",
+		"customer":"cus_123",
+		"currency":"eur",
+		"subtotal":11900,
+		"total":11900,
+		"lines":{
+			"data":[
+				{
+					"taxes":[],
+					"price":{"id":"price_123","type":"one_time","product":"prod_price"},
+					"pricing":{"price_details":{"product":"prod_pricing"}}
+				}
+			]
+		}
+	}`)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Fatalf("unexpected method %s", r.Method)
+		}
+		if r.URL.Path != "/v1/invoices/in_123" {
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+		query := r.URL.Query()["expand[]"]
+		if !contains(query, "lines.data.taxes") {
+			t.Fatalf("missing taxes expand, got %v", query)
+		}
+		if !contains(query, "lines.data.price.product") {
+			t.Fatalf("missing price product expand, got %v", query)
+		}
+		if !contains(query, "lines.data.pricing.price_details.product") {
+			t.Fatalf("missing pricing product expand, got %v", query)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(fixture)
+	}))
+	defer server.Close()
+
+	client := NewClient(config.StripeConfig{
+		APIKey:        "sk_test",
+		WebhookSecret: "whsec_test",
+		APIBaseURL:    server.URL + "/v1",
+	})
+
+	invoice, raw, err := client.GetInvoice(context.Background(), "in_123")
+	if err != nil {
+		t.Fatalf("GetInvoice returned error: %v", err)
+	}
+	if invoice.ID != "in_123" {
+		t.Fatalf("unexpected invoice id %q", invoice.ID)
+	}
+	if got := invoice.Lines.Data[0].Price.Product.ID; got != "prod_price" {
+		t.Fatalf("unexpected price product id %q", got)
+	}
+	if got := invoice.Lines.Data[0].Pricing.PriceDetails.Product.ID; got != "prod_pricing" {
+		t.Fatalf("unexpected pricing product id %q", got)
+	}
+	if !strings.Contains(string(raw), "\"in_123\"") {
+		t.Fatalf("raw response missing invoice id: %s", string(raw))
 	}
 }
 
@@ -210,4 +274,13 @@ func domainBalanceTransaction(currency string, amountMinor, feeMinor, netMinor, 
 		AmountSEKOre: &amountSEK,
 		FeeSEKOre:    &feeSEK,
 	}
+}
+
+func contains(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }

@@ -14,13 +14,13 @@ import (
 	"github.com/ecleangg/booky/internal/support"
 )
 
-func (s *Service) SyncWebhookEntries(ctx context.Context, snapshots []domain.ObjectSnapshot, facts []domain.AccountingFact) error {
+func (s *Service) SyncWebhookEntries(ctx context.Context, taxCases []domain.TaxCase, facts []domain.AccountingFact) error {
 	if !s.Enabled() {
 		return nil
 	}
 
 	sourceGroups := filingSourceGroups(facts)
-	ossEntries, psEntries, periods, err := s.BuildWebhookEntries(ctx, snapshots, facts)
+	ossEntries, psEntries, periods, err := s.BuildWebhookEntries(ctx, taxCases, facts)
 	if err != nil {
 		return err
 	}

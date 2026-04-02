@@ -28,6 +28,9 @@ func NewRouter(cfg config.Config, stripeService *stripe.Service, accountingServi
 		mux.Handle("/admin/filings", withBearerAuth(cfg.Admin.BearerToken, filingStatusHandler(logger, filingsService)))
 		mux.Handle("/admin/filings/mark-submitted", withBearerAuth(cfg.Admin.BearerToken, filingMarkSubmittedHandler(logger, filingsService)))
 		mux.Handle("/admin/bokio/check", withBearerAuth(cfg.Admin.BearerToken, bokioCheckHandler(logger, bokioClient)))
+		mux.Handle("/admin/tax/cases/rebuild", withBearerAuth(cfg.Admin.BearerToken, taxCaseRebuildHandler(logger, stripeService)))
+		mux.Handle("/admin/tax/cases/manual-evidence", withBearerAuth(cfg.Admin.BearerToken, manualTaxEvidenceHandler(logger, stripeService)))
+		mux.Handle("/admin/tax/cases/", withBearerAuth(cfg.Admin.BearerToken, taxCaseHandler(logger, stripeService)))
 	}
 
 	return withJSONHeaders(withLogging(logger, mux))

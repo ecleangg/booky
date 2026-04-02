@@ -7,44 +7,32 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/ecleangg/booky/internal/config"
 	"github.com/ecleangg/booky/internal/domain"
 	"github.com/ecleangg/booky/internal/support"
 )
 
 func isOSSCandidate(input filingContext) bool {
-	vatTreatment := normalizeVATMode(input.VATTreatment)
-	if vatTreatment == "import_oss" || vatTreatment == "ioss" {
-		return true
-	}
-	if vatTreatment == "eu_oss" || support.MapTruthy(input.AllMetadata, "booky_oss_applied", "oss_applied") {
-		return support.IsEUCountry(input.Country) && input.Country != "SE"
-	}
-	return false
+	return strings.HasPrefix(strings.TrimSpace(input.TaxStatus), "EU_") && strings.HasSuffix(strings.TrimSpace(input.TaxStatus), "_B2C")
 }
 
 func isPSCandidate(input filingContext) bool {
-	if strings.EqualFold(strings.TrimSpace(input.MarketCode), "EU_B2B") {
-		return true
-	}
-	if input.BuyerVATNumber == "" {
-		return false
-	}
-	cc := support.CountryPrefix(input.BuyerVATNumber)
-	return support.IsEUCountry(cc) && cc != "SE"
+	return strings.HasPrefix(strings.TrimSpace(input.TaxStatus), "EU_") &&
+		strings.HasSuffix(strings.TrimSpace(input.TaxStatus), "_B2B") &&
+		strings.TrimSpace(input.BuyerVATNumber) != ""
 }
 
-func resolveSaleType(saleCategory string, shippingEvidence bool) (string, string) {
-	switch strings.ToLower(strings.TrimSpace(saleCategory)) {
-	case "goods", "physical_goods", "physical":
-		return "GOODS", ""
-	case "":
-		if shippingEvidence {
-			return "", "shipping evidence suggests goods but sale_category is missing"
+func filingUnsupportedReason(input filingContext) string {
+	if input.ReportabilityState != domain.Reportable {
+		if strings.TrimSpace(input.ReviewReason) != "" {
+			return input.ReviewReason
 		}
-		return "SERVICES", ""
-	default:
-		return "SERVICES", ""
+		return "tax case is not reportable"
 	}
+	if isPSCandidate(input) && strings.TrimSpace(input.BuyerVATNumber) == "" {
+		return "EU B2B sale is missing buyer VAT ID for periodic summary"
+	}
+	return ""
 }
 
 func mapPSSaleType(saleType string) string {
@@ -58,27 +46,11 @@ func mapPSSaleType(saleType string) string {
 	}
 }
 
-func filingUnsupportedReason(input filingContext) string {
-	metadata := input.AllMetadata
-	if containsMetadataValue(metadata, []string{"booky_vat_mode", "vat_mode"}, []string{"import_oss", "ioss", "import"}) {
-		return "import OSS is unsupported in v1"
+func valueOrEmpty(value *string) string {
+	if value == nil {
+		return ""
 	}
-	if containsMetadataValue(metadata, []string{"triangulation", "booky_triangulation", "triangulation_code"}, []string{"1", "true", "x"}) {
-		return "triangulation is unsupported in v1"
-	}
-	if containsMetadataValue(metadata, []string{"booky_call_off_stock", "call_off_stock", "avropslager"}, []string{"1", "true", "x", "y", "z"}) {
-		return "call-off stock / avropslager is unsupported in v1"
-	}
-	if containsMetadataValue(metadata, []string{"periodic_summary_marker", "ps_marker"}, []string{"x", "y", "z"}) {
-		return "call-off stock / avropslager markers X/Y/Z are unsupported in v1"
-	}
-	if origin := support.NormalizeCountry(support.MapString(metadata, "booky_origin_country", "origin_country", "dispatch_from_country", "establishment_country")); origin != "" && origin != "SE" {
-		return "non-Swedish OSS origin establishment is unsupported in v1"
-	}
-	if isPSCandidate(input) && strings.TrimSpace(input.BuyerVATNumber) == "" {
-		return "EU B2B sale is missing buyer VAT ID for periodic summary"
-	}
-	return ""
+	return *value
 }
 
 func snapshotKey(objectType, objectID string) string {
@@ -238,21 +210,31 @@ func vatRateBasisPoints(revenueSEKOre, vatSEKOre int64) int {
 	return int(math.Round((float64(vatSEKOre) / float64(revenueSEKOre)) * 10000))
 }
 
-func containsMetadataValue(metadata map[string]string, keys, values []string) bool {
-	allowed := map[string]struct{}{}
-	for _, value := range values {
-		allowed[strings.ToLower(strings.TrimSpace(value))] = struct{}{}
+func configuredVATRateBasisPoints(cfg config.Config, marketCode string) (int, bool) {
+	marketCode = strings.ToUpper(strings.TrimSpace(marketCode))
+	if marketCode == "" {
+		return 0, false
 	}
-	for _, key := range keys {
-		value := strings.ToLower(strings.TrimSpace(metadata[key]))
-		if value == "" {
-			continue
-		}
-		if _, ok := allowed[value]; ok {
-			return true
-		}
+
+	marketCfg, ok := cfg.Accounts.SalesByMarket[marketCode]
+	if !ok && cfg.Accounts.OtherCountriesDefault != nil && shouldUseOtherCountriesDefault(marketCode) {
+		marketCfg = *cfg.Accounts.OtherCountriesDefault
+		ok = true
 	}
-	return false
+	if !ok || marketCfg.VATRatePercent <= 0 {
+		return 0, false
+	}
+
+	return int(math.Round(marketCfg.VATRatePercent * 100)), true
+}
+
+func shouldUseOtherCountriesDefault(marketCode string) bool {
+	switch marketCode {
+	case "SE", "EU_B2B", "EXPORT":
+		return false
+	default:
+		return len(marketCode) == 2
+	}
 }
 
 func filingSourceGroups(facts []domain.AccountingFact) []string {

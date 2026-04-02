@@ -88,13 +88,6 @@ filings:
     responsible_phone: "+46701234567"
     responsible_email: finance@eclean.gg
 
-  # Exchange-rate sources used when filing output needs FX conversion.
-  fx:
-    oss_provider: ecb_period_end
-    ps_provider: riksbank_monthly_average
-    ecb_base_url: https://www.ecb.europa.eu
-    riksbank_base_url: https://api.riksbank.se
-
 # Bokio account mappings.
 # These are the most important values to review before going live.
 accounts:

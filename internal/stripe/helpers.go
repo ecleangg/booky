@@ -181,3 +181,11 @@ func proportionalAmount(total int64, partMinor int64, wholeMinor int64) int64 {
 func minorToOre(amountMinor int64) int64 {
 	return amountMinor
 }
+
+func rawJSON(v any) json.RawMessage {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return json.RawMessage(`{}`)
+	}
+	return b
+}

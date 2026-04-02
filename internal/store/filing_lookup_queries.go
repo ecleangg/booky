@@ -13,7 +13,7 @@ import (
 
 func (q *Queries) ListFilingRelevantFactsByDateRange(ctx context.Context, companyID uuid.UUID, fromDate, toDate time.Time) ([]domain.AccountingFact, error) {
 	rows, err := q.db.Query(ctx, `
-		SELECT id, bokio_company_id, stripe_account_id, source_group_id, source_object_type,
+		SELECT id, bokio_company_id, stripe_account_id, tax_case_id, source_group_id, source_object_type,
 			source_object_id, stripe_balance_transaction_id, stripe_event_id, fact_type,
 			posting_date, market_code, vat_treatment, source_currency, source_amount_minor,
 			amount_sek_ore, bokio_account, direction, status, review_reason, payload,

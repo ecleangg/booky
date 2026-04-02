@@ -15,7 +15,7 @@ func TestStripeWebhookHandlerReturnsUnauthorizedForFutureSignature(t *testing.T)
 		APIKey:        "sk_test",
 		WebhookSecret: "whsec_test",
 		APIBaseURL:    "https://api.stripe.test",
-	}), nil, nil, discardLogger()))
+	}), nil, nil, nil, discardLogger()))
 
 	req := httptest.NewRequest(http.MethodPost, "/webhooks/stripe", strings.NewReader(`{"id":"evt_123","type":"charge.succeeded","data":{"object":{}}}`))
 	req.Header.Set("Stripe-Signature", "t=9999999999,v1=deadbeef")

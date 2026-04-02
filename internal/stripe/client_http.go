@@ -81,15 +81,58 @@ func (c *Client) GetPaymentIntent(ctx context.Context, id string) (PaymentIntent
 	return paymentIntent, raw, nil
 }
 
+func (c *Client) GetCheckoutSession(ctx context.Context, id string) (CheckoutSession, json.RawMessage, error) {
+	var session CheckoutSession
+	raw, err := c.getJSON(ctx, "/v1/checkout/sessions/"+id, &session)
+	if err != nil {
+		return CheckoutSession{}, nil, err
+	}
+	enriched, err := c.enrichCheckoutSession(ctx, session)
+	if err != nil {
+		return CheckoutSession{}, nil, err
+	}
+	enrichedRaw, err := json.Marshal(enriched)
+	if err != nil {
+		return CheckoutSession{}, nil, fmt.Errorf("encode enriched checkout session: %w", err)
+	}
+	_ = raw
+	return enriched, enrichedRaw, nil
+}
+
+func (c *Client) ListCheckoutSessionsByPaymentIntent(ctx context.Context, paymentIntentID string) ([]CheckoutSession, []json.RawMessage, error) {
+	params := url.Values{}
+	params.Add("limit", "100")
+	params.Add("payment_intent", paymentIntentID)
+	return c.listCheckoutSessions(ctx, params)
+}
+
+func (c *Client) ListCheckoutSessionsBySubscription(ctx context.Context, subscriptionID string) ([]CheckoutSession, []json.RawMessage, error) {
+	params := url.Values{}
+	params.Add("limit", "100")
+	params.Add("subscription", subscriptionID)
+	return c.listCheckoutSessions(ctx, params)
+}
+
 func (c *Client) GetInvoice(ctx context.Context, id string) (Invoice, json.RawMessage, error) {
 	var invoice Invoice
 	params := url.Values{}
 	params.Add("expand[]", "lines.data.taxes")
+	params.Add("expand[]", "lines.data.price.product")
+	params.Add("expand[]", "lines.data.pricing.price_details.product")
 	raw, err := c.getJSON(ctx, "/v1/invoices/"+id+"?"+params.Encode(), &invoice)
 	if err != nil {
 		return Invoice{}, nil, err
 	}
 	return invoice, raw, nil
+}
+
+func (c *Client) GetRefund(ctx context.Context, id string) (Refund, json.RawMessage, error) {
+	var refund Refund
+	raw, err := c.getJSON(ctx, "/v1/refunds/"+id, &refund)
+	if err != nil {
+		return Refund{}, nil, err
+	}
+	return refund, raw, nil
 }
 
 func (c *Client) GetCustomer(ctx context.Context, id string) (Customer, json.RawMessage, error) {
@@ -172,6 +215,46 @@ func (c *Client) getJSON(ctx context.Context, path string, out any) (json.RawMes
 		return nil, fmt.Errorf("decode stripe response: %w", err)
 	}
 	return body, nil
+}
+
+func (c *Client) listCheckoutSessions(ctx context.Context, params url.Values) ([]CheckoutSession, []json.RawMessage, error) {
+	var list checkoutSessionList
+	raw, err := c.getJSON(ctx, "/v1/checkout/sessions?"+params.Encode(), &list)
+	if err != nil {
+		return nil, nil, err
+	}
+	_ = raw
+	sessions := make([]CheckoutSession, 0, len(list.Data))
+	raws := make([]json.RawMessage, 0, len(list.Data))
+	for _, item := range list.Data {
+		var session CheckoutSession
+		if err := json.Unmarshal(item, &session); err != nil {
+			return nil, nil, fmt.Errorf("decode checkout session: %w", err)
+		}
+		enriched, err := c.enrichCheckoutSession(ctx, session)
+		if err != nil {
+			return nil, nil, err
+		}
+		enrichedRaw, err := json.Marshal(enriched)
+		if err != nil {
+			return nil, nil, fmt.Errorf("encode enriched checkout session: %w", err)
+		}
+		sessions = append(sessions, enriched)
+		raws = append(raws, enrichedRaw)
+	}
+	return sessions, raws, nil
+}
+
+func (c *Client) enrichCheckoutSession(ctx context.Context, session CheckoutSession) (CheckoutSession, error) {
+	var lineItems checkoutLineItemList
+	params := url.Values{}
+	params.Add("limit", "100")
+	params.Add("expand[]", "data.price.product")
+	if _, err := c.getJSON(ctx, "/v1/checkout/sessions/"+session.ID+"/line_items?"+params.Encode(), &lineItems); err != nil {
+		return CheckoutSession{}, err
+	}
+	session.LineItems = lineItems
+	return session, nil
 }
 
 func parseStripeSignature(header string) (int64, []string, error) {

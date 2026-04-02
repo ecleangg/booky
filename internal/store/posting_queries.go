@@ -172,7 +172,7 @@ func (q *Queries) GetBokioJournalByRunID(ctx context.Context, runID uuid.UUID) (
 
 func (q *Queries) ListFactsByRun(ctx context.Context, runID uuid.UUID) ([]domain.AccountingFact, error) {
 	rows, err := q.db.Query(ctx, `
-		SELECT f.id, f.bokio_company_id, f.stripe_account_id, f.source_group_id, f.source_object_type,
+		SELECT f.id, f.bokio_company_id, f.stripe_account_id, f.tax_case_id, f.source_group_id, f.source_object_type,
 			f.source_object_id, f.stripe_balance_transaction_id, f.stripe_event_id, f.fact_type,
 			f.posting_date, f.market_code, f.vat_treatment, f.source_currency, f.source_amount_minor,
 			f.amount_sek_ore, f.bokio_account, f.direction, f.status, f.review_reason, f.payload,

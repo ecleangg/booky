@@ -137,16 +137,6 @@ func Validate(cfg Config) error {
 		if len(cfg.Filings.EmailTo) == 0 {
 			errs = append(errs, "filings.email_to must contain at least one recipient when filings.enabled is true")
 		}
-		switch cfg.Filings.FX.OSSProvider {
-		case "ecb_period_end":
-		default:
-			errs = append(errs, fmt.Sprintf("filings.fx.oss_provider %q is unsupported", cfg.Filings.FX.OSSProvider))
-		}
-		switch cfg.Filings.FX.PSProvider {
-		case "riksbank_monthly_average":
-		default:
-			errs = append(errs, fmt.Sprintf("filings.fx.ps_provider %q is unsupported", cfg.Filings.FX.PSProvider))
-		}
 		if cfg.Filings.OSSUnion.Enabled {
 			if strings.TrimSpace(cfg.Filings.OSSUnion.IdentifierNumber) == "" {
 				errs = append(errs, "filings.oss_union.identifier_number is required when enabled")

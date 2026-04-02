@@ -187,18 +187,6 @@ func setDefaults(cfg *Config) {
 	if cfg.Filings.PeriodicSummary.Cadence == "" {
 		cfg.Filings.PeriodicSummary.Cadence = "monthly"
 	}
-	if cfg.Filings.FX.OSSProvider == "" {
-		cfg.Filings.FX.OSSProvider = "ecb_period_end"
-	}
-	if cfg.Filings.FX.PSProvider == "" {
-		cfg.Filings.FX.PSProvider = "riksbank_monthly_average"
-	}
-	if cfg.Filings.FX.ECBBaseURL == "" {
-		cfg.Filings.FX.ECBBaseURL = "https://www.ecb.europa.eu"
-	}
-	if cfg.Filings.FX.RiksbankBaseURL == "" {
-		cfg.Filings.FX.RiksbankBaseURL = "https://api.riksbank.se"
-	}
 }
 
 func (c Config) Location() (*time.Location, error) {

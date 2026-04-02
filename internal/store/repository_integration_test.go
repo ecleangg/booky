@@ -224,6 +224,70 @@ func TestQueriesAccountingPostingLifecycle(t *testing.T) {
 	}
 }
 
+func TestQueriesUpsertTaxCaseReturnsPersistedIDOnConflict(t *testing.T) {
+	repo, _ := testutil.NewTestRepository(t)
+	q := repo.Queries()
+	ctx := context.Background()
+	companyID := testutil.TestConfig().Bokio.CompanyID
+
+	first := domain.TaxCase{
+		ID:                 uuid.New(),
+		BokioCompanyID:     companyID,
+		RootObjectType:     "charge",
+		RootObjectID:       "ch_123",
+		Livemode:           false,
+		ReportabilityState: domain.NeedsReview,
+		Dossier:            json.RawMessage(`{"version":1}`),
+	}
+	firstID, err := q.UpsertTaxCase(ctx, first)
+	if err != nil {
+		t.Fatalf("first UpsertTaxCase returned error: %v", err)
+	}
+	if firstID != first.ID {
+		t.Fatalf("expected inserted id %s, got %s", first.ID, firstID)
+	}
+
+	second := first
+	second.ID = uuid.New()
+	second.Dossier = json.RawMessage(`{"version":2}`)
+	persistedID, err := q.UpsertTaxCase(ctx, second)
+	if err != nil {
+		t.Fatalf("second UpsertTaxCase returned error: %v", err)
+	}
+	if persistedID != first.ID {
+		t.Fatalf("expected conflict to keep original id %s, got %s", first.ID, persistedID)
+	}
+
+	stored, err := q.GetTaxCaseByRoot(ctx, companyID, "charge", "ch_123")
+	if err != nil {
+		t.Fatalf("GetTaxCaseByRoot returned error: %v", err)
+	}
+	if stored.ID != first.ID {
+		t.Fatalf("expected stored id %s, got %s", first.ID, stored.ID)
+	}
+
+	objects := []domain.TaxCaseObject{{
+		TaxCaseID:  second.ID,
+		ObjectType: "charge",
+		ObjectID:   "ch_123",
+		ObjectRole: "root",
+	}}
+	if err := q.ReplaceTaxCaseObjects(ctx, persistedID, objects); err != nil {
+		t.Fatalf("ReplaceTaxCaseObjects returned error: %v", err)
+	}
+
+	storedObjects, err := q.ListTaxCaseObjects(ctx, first.ID)
+	if err != nil {
+		t.Fatalf("ListTaxCaseObjects returned error: %v", err)
+	}
+	if len(storedObjects) != 1 {
+		t.Fatalf("expected 1 object, got %d", len(storedObjects))
+	}
+	if storedObjects[0].TaxCaseID != first.ID {
+		t.Fatalf("expected stored object tax_case_id %s, got %s", first.ID, storedObjects[0].TaxCaseID)
+	}
+}
+
 func TestQueriesFilingLifecycle(t *testing.T) {
 	repo, _ := testutil.NewTestRepository(t)
 	q := repo.Queries()

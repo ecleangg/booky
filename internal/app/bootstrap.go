@@ -18,6 +18,7 @@ import (
 	"github.com/ecleangg/booky/internal/pdf"
 	"github.com/ecleangg/booky/internal/store"
 	"github.com/ecleangg/booky/internal/stripe"
+	"github.com/ecleangg/booky/internal/tax"
 )
 
 type App struct {
@@ -61,9 +62,10 @@ func New(ctx context.Context, configPath string) (*App, error) {
 		notifier = notify.NewResendNotifier(cfg.Notifications.Resend)
 	}
 	pdfGenerator := pdf.NewGenerator()
+	taxService := tax.NewService(cfg, repo, logger)
 	accountingService := accounting.NewService(cfg, repo, bokioClient, notifier, pdfGenerator, logger)
 	filingsService := filings.NewService(cfg, repo, notifier, logger)
-	stripeService := stripe.NewService(cfg, repo, stripeClient, notifier, filingsService, logger)
+	stripeService := stripe.NewService(cfg, repo, stripeClient, taxService, notifier, filingsService, logger)
 	router := httpapi.NewRouter(cfg, stripeService, accountingService, filingsService, bokioClient, logger)
 
 	server := &http.Server{

@@ -9,7 +9,6 @@ type FilingsConfig struct {
 	EmailTo         []string                     `yaml:"email_to"`
 	OSSUnion        OSSUnionFilingsConfig        `yaml:"oss_union"`
 	PeriodicSummary PeriodicSummaryFilingsConfig `yaml:"periodic_summary"`
-	FX              FilingFXConfig               `yaml:"fx"`
 
 	leadTimeDaysSet bool
 }
@@ -28,14 +27,6 @@ type PeriodicSummaryFilingsConfig struct {
 	ResponsibleName    string `yaml:"responsible_name"`
 	ResponsiblePhone   string `yaml:"responsible_phone"`
 	ResponsibleEmail   string `yaml:"responsible_email"`
-}
-
-type FilingFXConfig struct {
-	OSSProvider     string `yaml:"oss_provider"`
-	PSProvider      string `yaml:"ps_provider"`
-	ECBBaseURL      string `yaml:"ecb_base_url"`
-	RiksbankBaseURL string `yaml:"riksbank_base_url"`
-	RiksbankAPIKey  string `yaml:"riksbank_api_key"`
 }
 
 func (c *FilingsConfig) UnmarshalYAML(value *yaml.Node) error {

@@ -12,16 +12,17 @@ func (q *Queries) UpsertOSSUnionEntries(ctx context.Context, entries []domain.OS
 	for _, entry := range entries {
 		_, err := q.db.Exec(ctx, `
 			INSERT INTO oss_union_entries (
-				id, bokio_company_id, source_group_id, source_object_type, source_object_id, stripe_event_id,
+				id, bokio_company_id, tax_case_id, source_group_id, source_object_type, source_object_id, stripe_event_id,
 				original_supply_period, filing_period, correction_target_period, consumption_country,
 				origin_country, origin_identifier, sale_type, vat_rate_basis_points,
 				taxable_amount_eur_cents, vat_amount_eur_cents, review_state, review_reason, payload
 			) VALUES (
 				$1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-				$11, $12, $13, $14, $15, $16, $17, $18, $19
+				$11, $12, $13, $14, $15, $16, $17, $18, $19, $20
 			)
 			ON CONFLICT (source_group_id) DO UPDATE SET
 				bokio_company_id = EXCLUDED.bokio_company_id,
+				tax_case_id = EXCLUDED.tax_case_id,
 				source_object_type = EXCLUDED.source_object_type,
 				source_object_id = EXCLUDED.source_object_id,
 				stripe_event_id = EXCLUDED.stripe_event_id,
@@ -42,6 +43,7 @@ func (q *Queries) UpsertOSSUnionEntries(ctx context.Context, entries []domain.OS
 		`,
 			entry.ID,
 			entry.BokioCompanyID,
+			entry.TaxCaseID,
 			entry.SourceGroupID,
 			entry.SourceObjectType,
 			entry.SourceObjectID,
@@ -80,15 +82,16 @@ func (q *Queries) UpsertPeriodicSummaryEntries(ctx context.Context, entries []do
 	for _, entry := range entries {
 		_, err := q.db.Exec(ctx, `
 			INSERT INTO periodic_summary_entries (
-				id, bokio_company_id, source_group_id, source_object_type, source_object_id, stripe_event_id,
+				id, bokio_company_id, tax_case_id, source_group_id, source_object_type, source_object_id, stripe_event_id,
 				filing_period, buyer_vat_number, row_type, amount_sek_ore, exported_amount_sek,
 				review_state, review_reason, payload
 			) VALUES (
 				$1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-				$11, $12, $13, $14
+				$11, $12, $13, $14, $15
 			)
 			ON CONFLICT (source_group_id) DO UPDATE SET
 				bokio_company_id = EXCLUDED.bokio_company_id,
+				tax_case_id = EXCLUDED.tax_case_id,
 				source_object_type = EXCLUDED.source_object_type,
 				source_object_id = EXCLUDED.source_object_id,
 				stripe_event_id = EXCLUDED.stripe_event_id,
@@ -104,6 +107,7 @@ func (q *Queries) UpsertPeriodicSummaryEntries(ctx context.Context, entries []do
 		`,
 			entry.ID,
 			entry.BokioCompanyID,
+			entry.TaxCaseID,
 			entry.SourceGroupID,
 			entry.SourceObjectType,
 			entry.SourceObjectID,
@@ -135,7 +139,7 @@ func (q *Queries) DeletePeriodicSummaryEntriesBySourceGroups(ctx context.Context
 
 func (q *Queries) ListOSSUnionEntriesByPeriod(ctx context.Context, companyID uuid.UUID, period string) ([]domain.OSSUnionEntry, error) {
 	rows, err := q.db.Query(ctx, `
-		SELECT id, bokio_company_id, source_group_id, source_object_type, source_object_id, stripe_event_id,
+		SELECT id, bokio_company_id, tax_case_id, source_group_id, source_object_type, source_object_id, stripe_event_id,
 			original_supply_period, filing_period, correction_target_period, consumption_country,
 			origin_country, origin_identifier, sale_type, vat_rate_basis_points,
 			taxable_amount_eur_cents, vat_amount_eur_cents, review_state, review_reason, payload,
@@ -165,7 +169,7 @@ func (q *Queries) ListOSSUnionEntriesByPeriod(ctx context.Context, companyID uui
 
 func (q *Queries) ListPeriodicSummaryEntriesByPeriod(ctx context.Context, companyID uuid.UUID, period string) ([]domain.PeriodicSummaryEntry, error) {
 	rows, err := q.db.Query(ctx, `
-		SELECT id, bokio_company_id, source_group_id, source_object_type, source_object_id, stripe_event_id,
+		SELECT id, bokio_company_id, tax_case_id, source_group_id, source_object_type, source_object_id, stripe_event_id,
 			filing_period, buyer_vat_number, row_type, amount_sek_ore, exported_amount_sek,
 			review_state, review_reason, payload, created_at, updated_at
 		FROM periodic_summary_entries

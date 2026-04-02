@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/ecleangg/booky/internal/domain"
+	"github.com/google/uuid"
 )
 
 type stripeEventEnvelope struct {
@@ -90,6 +91,9 @@ type filingFacts struct {
 }
 
 type filingContext struct {
+	TaxCaseID          *uuid.UUID
+	TaxStatus          string
+	ReportabilityState string
 	GroupID            string
 	SourceObjectType   string
 	SourceObjectID     string

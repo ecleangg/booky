@@ -49,12 +49,6 @@ func TestConfig() config.Config {
 				ResponsiblePhone:   "+46701234567",
 				ResponsibleEmail:   "finance@eclean.gg",
 			},
-			FX: config.FilingFXConfig{
-				OSSProvider:     "ecb_period_end",
-				PSProvider:      "riksbank_monthly_average",
-				ECBBaseURL:      "https://ecb.test",
-				RiksbankBaseURL: "https://riksbank.test",
-			},
 		},
 		Accounts: config.AccountsConfig{
 			StripeReceivable:        1580,

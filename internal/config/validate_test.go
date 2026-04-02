@@ -60,10 +60,6 @@ func TestValidateAcceptsExpectedConfig(t *testing.T) {
 				ResponsiblePhone:   "+46701234567",
 				ResponsibleEmail:   "finance@eclean.gg",
 			},
-			FX: FilingFXConfig{
-				OSSProvider: "ecb_period_end",
-				PSProvider:  "riksbank_monthly_average",
-			},
 		},
 	}
 
@@ -122,10 +118,6 @@ func TestValidateRejectsEnabledAdminWithoutToken(t *testing.T) {
 				ResponsibleName:    "eclean Finance",
 				ResponsiblePhone:   "+46701234567",
 				ResponsibleEmail:   "finance@eclean.gg",
-			},
-			FX: FilingFXConfig{
-				OSSProvider: "ecb_period_end",
-				PSProvider:  "riksbank_monthly_average",
 			},
 		},
 	}

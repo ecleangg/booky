@@ -8,10 +8,12 @@ import (
 	"fmt"
 
 	"github.com/ecleangg/booky/internal/domain"
+	"github.com/google/uuid"
 )
 
 func scanAccountingFact(row interface{ Scan(dest ...any) error }) (domain.AccountingFact, error) {
 	var fact domain.AccountingFact
+	var taxCaseID uuid.NullUUID
 	var stripeBalanceID, stripeEventID sql.NullString
 	var marketCode, vatTreatment, sourceCurrency, reviewReason sql.NullString
 	var sourceAmount sql.NullInt64
@@ -20,6 +22,7 @@ func scanAccountingFact(row interface{ Scan(dest ...any) error }) (domain.Accoun
 		&fact.ID,
 		&fact.BokioCompanyID,
 		&fact.StripeAccountID,
+		&taxCaseID,
 		&fact.SourceGroupID,
 		&fact.SourceObjectType,
 		&fact.SourceObjectID,
@@ -41,6 +44,9 @@ func scanAccountingFact(row interface{ Scan(dest ...any) error }) (domain.Accoun
 		&fact.UpdatedAt,
 	); err != nil {
 		return domain.AccountingFact{}, fmt.Errorf("scan accounting fact: %w", err)
+	}
+	if taxCaseID.Valid {
+		fact.TaxCaseID = &taxCaseID.UUID
 	}
 	if stripeBalanceID.Valid {
 		fact.StripeBalanceTransactionID = &stripeBalanceID.String

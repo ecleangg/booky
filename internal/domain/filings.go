@@ -25,6 +25,7 @@ const (
 type OSSUnionEntry struct {
 	ID                     uuid.UUID
 	BokioCompanyID         uuid.UUID
+	TaxCaseID              *uuid.UUID
 	SourceGroupID          string
 	SourceObjectType       string
 	SourceObjectID         string
@@ -49,6 +50,7 @@ type OSSUnionEntry struct {
 type PeriodicSummaryEntry struct {
 	ID                uuid.UUID
 	BokioCompanyID    uuid.UUID
+	TaxCaseID         *uuid.UUID
 	SourceGroupID     string
 	SourceObjectType  string
 	SourceObjectID    string
@@ -93,13 +95,4 @@ type FilingExport struct {
 	SupersededBy   *uuid.UUID
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
-}
-
-type FXRate struct {
-	Provider      string
-	BaseCurrency  string
-	QuoteCurrency string
-	Period        string
-	Rate          float64
-	ObservedAt    time.Time
 }

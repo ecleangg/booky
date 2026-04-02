@@ -79,6 +79,7 @@ type AccountingFact struct {
 	ID                         uuid.UUID
 	BokioCompanyID             uuid.UUID
 	StripeAccountID            string
+	TaxCaseID                  *uuid.UUID
 	SourceGroupID              string
 	SourceObjectType           string
 	SourceObjectID             string
@@ -141,6 +142,7 @@ type JournalDraft struct {
 	GeneratedAt time.Time
 	Items       []JournalItem
 	Facts       []AccountingFact
+	TaxCases    []TaxCase
 	Summary     map[string]any
 	PostingRun  PostingRun
 	Description string

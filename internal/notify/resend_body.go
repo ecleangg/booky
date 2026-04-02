@@ -34,7 +34,7 @@ func buildBody(notification Notification) string {
 		}
 	}
 	if len(notification.ActionLines) > 0 {
-		b.WriteString("\nHow To Handle\n")
+		b.WriteString("\nHow to handle\n")
 		for _, line := range notification.ActionLines {
 			b.WriteString("- ")
 			b.WriteString(line)

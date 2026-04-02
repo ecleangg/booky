@@ -50,11 +50,11 @@ func TestResendNotifierSendUsesNotificationOverrides(t *testing.T) {
 	})
 
 	err := notifier.Send(context.Background(), Notification{
-		Severity:    SeverityWarning,
-		Category:    CategoryDailyCloseWarning,
-		CompanyID:   uuid.MustParse("11111111-1111-1111-1111-111111111111").String(),
-		To:          []string{"override@example.com"},
-		Subject:     "Daily close warning",
+		Severity:     SeverityWarning,
+		Category:     CategoryDailyCloseWarning,
+		CompanyID:    uuid.MustParse("11111111-1111-1111-1111-111111111111").String(),
+		To:           []string{"override@example.com"},
+		Subject:      "Daily close warning",
 		SummaryLines: []string{"One warning"},
 		Attachments: []Attachment{{
 			Filename:    "draft.txt",
@@ -106,7 +106,7 @@ func TestBuildBodyIncludesStructuredSections(t *testing.T) {
 		"- Summary line",
 		"Details",
 		"- Detail line",
-		"How To Handle",
+		"How to handle",
 		"- Action line",
 	} {
 		if !strings.Contains(body, wanted) {

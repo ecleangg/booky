@@ -3,6 +3,8 @@ package notify
 import (
 	"context"
 	"time"
+
+	"github.com/ecleangg/booky/internal/config"
 )
 
 type Severity string
@@ -50,4 +52,11 @@ type Notification struct {
 
 type Notifier interface {
 	Send(ctx context.Context, notification Notification) error
+}
+
+func NewNotifier(cfg config.NotificationsConfig) Notifier {
+	if !cfg.Resend.Enabled {
+		return nil
+	}
+	return NewResendNotifier(cfg.Resend)
 }

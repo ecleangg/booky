@@ -48,6 +48,7 @@ func NewRouter(cfg config.Config, stripeService *stripe.Service, accountingServi
 		mux.Handle("GET /v1/bokio/companies", protected(bokioCompaniesHandler(integrationsService)))
 		mux.Handle("GET /v1/bokio/companies/{companyId}", protected(bokioCompanyHandler(integrationsService)))
 		mux.Handle("GET /v1/bokio/companies/{companyId}/chart-of-accounts", protected(bokioCompanyChartHandler(integrationsService)))
+		mux.Handle("GET /v1/bokio/companies/{companyId}/settings", protected(bokioCompanySettingsGetHandler(integrationsService)))
 		mux.Handle("PUT /v1/bokio/companies/{companyId}/settings", protected(bokioCompanySettingsHandler(integrationsService)))
 		mux.Handle("POST /v1/bokio/companies/{companyId}/validate", protected(bokioCompanyValidateHandler(integrationsService)))
 		mux.Handle("DELETE /v1/bokio/companies/{companyId}/connection", protected(bokioCompanyDeleteHandler(integrationsService)))

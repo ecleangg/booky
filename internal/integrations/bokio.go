@@ -126,17 +126,17 @@ func (s *Service) CompleteBokioOAuth(ctx context.Context, stateValue, code, oaut
 		return "", err
 	}
 	conn := domain.BokioConnection{
-		ID:                 uuid.New(),
-		WorkspaceID:        state.WorkspaceID,
-		BokioConnectionID:  connectionPayload.ID,
-		BokioCompanyID:     token.TenantID,
-		CompanyName:        companyName,
-		TokenExpiresAt:     time.Now().UTC().Add(time.Duration(token.ExpiresIn) * time.Second),
-		Scope:              token.Scope,
-		Settings:           nil,
-		SettingsVersion:    1,
-		Status:             domain.ConnectionStatusActive,
-		ConnectedAt:        time.Now().UTC(),
+		ID:                uuid.New(),
+		WorkspaceID:       state.WorkspaceID,
+		BokioConnectionID: connectionPayload.ID,
+		BokioCompanyID:    token.TenantID,
+		CompanyName:       companyName,
+		TokenExpiresAt:    time.Now().UTC().Add(time.Duration(token.ExpiresIn) * time.Second),
+		Scope:             token.Scope,
+		Settings:          nil,
+		SettingsVersion:   1,
+		Status:            domain.ConnectionStatusActive,
+		ConnectedAt:       time.Now().UTC(),
 	}
 	if existing.ID != uuid.Nil {
 		conn = existing
@@ -192,17 +192,21 @@ func (s *Service) GetBokioConnection(ctx context.Context, workspaceID string, co
 	return conn, settings, nil
 }
 
-func (s *Service) UpdateBokioCompanySettings(ctx context.Context, workspaceID string, companyID uuid.UUID, settings CompanySettings) (domain.BokioConnection, error) {
-	if err := ValidateCompanySettings(settings); err != nil {
-		return domain.BokioConnection{}, err
-	}
+func (s *Service) UpdateBokioCompanySettings(ctx context.Context, workspaceID string, companyID uuid.UUID, settings CompanySettings) (domain.BokioConnection, CompanySettings, error) {
 	conn, err := s.Repo.Queries().GetBokioConnectionByCompanyAndWorkspace(ctx, workspaceID, companyID)
 	if err != nil {
-		return domain.BokioConnection{}, err
+		return domain.BokioConnection{}, CompanySettings{}, err
 	}
 	raw, err := json.Marshal(settings)
 	if err != nil {
-		return domain.BokioConnection{}, fmt.Errorf("encode company settings: %w", err)
+		return domain.BokioConnection{}, CompanySettings{}, fmt.Errorf("encode company settings: %w", err)
+	}
+	resolved, err := ParseCompanySettings(raw, DefaultCompanySettings(s.Config))
+	if err != nil {
+		return domain.BokioConnection{}, CompanySettings{}, err
+	}
+	if err := ValidateCompanySettings(resolved); err != nil {
+		return domain.BokioConnection{}, CompanySettings{}, err
 	}
 	conn.Settings = raw
 	conn.SettingsVersion++
@@ -212,9 +216,9 @@ func (s *Service) UpdateBokioCompanySettings(ctx context.Context, workspaceID st
 	if err := s.Repo.InTx(ctx, func(q *store.Queries) error {
 		return q.SaveBokioConnection(ctx, conn)
 	}); err != nil {
-		return domain.BokioConnection{}, err
+		return domain.BokioConnection{}, CompanySettings{}, err
 	}
-	return conn, nil
+	return conn, resolved, nil
 }
 
 func (s *Service) GetBokioChartOfAccounts(ctx context.Context, workspaceID string, companyID uuid.UUID) ([]bokio.ChartAccount, error) {
@@ -259,12 +263,12 @@ func (s *Service) ValidateBokioConnection(ctx context.Context, workspaceID strin
 	}
 	accountValidationErr := client.ValidateAccounts(ctx, collectConfiguredAccounts(settings.Accounts))
 	return map[string]any{
-		"status":                "ok",
-		"bokio":                 checkResult,
-		"settings_valid":        accountValidationErr == nil,
-		"settings_error":        errorString(accountValidationErr),
-		"settings_version":      conn.SettingsVersion,
-		"oss_reporting_enabled": settings.OSSReportingEnabled,
+		"status":           "ok",
+		"bokio":            checkResult,
+		"settings":         settings,
+		"settings_valid":   accountValidationErr == nil,
+		"settings_error":   errorString(accountValidationErr),
+		"settings_version": conn.SettingsVersion,
 	}, nil
 }
 

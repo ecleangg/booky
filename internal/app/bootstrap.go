@@ -63,10 +63,7 @@ func New(ctx context.Context, configPath string) (*App, error) {
 		repo.Close()
 		return nil, err
 	}
-	var notifier notify.Notifier
-	if cfg.Notifications.Resend.Enabled {
-		notifier = notify.NewResendNotifier(cfg.Notifications.Resend)
-	}
+	notifier := notify.NewNotifier(cfg.Notifications)
 	pdfGenerator := pdf.NewGenerator()
 	taxService := tax.NewService(cfg, repo, logger)
 	accountingService := accounting.NewService(cfg, repo, bokioClient, notifier, pdfGenerator, integrationService, logger)

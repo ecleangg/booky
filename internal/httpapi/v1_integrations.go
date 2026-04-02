@@ -161,16 +161,16 @@ func bokioCompaniesHandler(service *integrations.Service) http.HandlerFunc {
 		for _, record := range records {
 			settings, _ := integrations.ParseCompanySettings(record.Settings, integrations.DefaultCompanySettings(service.Config))
 			items = append(items, map[string]any{
-				"id":                   record.ID,
-				"bokio_connection_id":  record.BokioConnectionID,
-				"bokio_company_id":     record.BokioCompanyID,
-				"company_name":         record.CompanyName,
-				"status":               record.Status,
-				"scope":                record.Scope,
-				"settings_version":     record.SettingsVersion,
-				"oss_reporting_enabled": settings.OSSReportingEnabled,
-				"connected_at":         record.ConnectedAt,
-				"disconnected_at":      record.DisconnectedAt,
+				"id":                  record.ID,
+				"bokio_connection_id": record.BokioConnectionID,
+				"bokio_company_id":    record.BokioCompanyID,
+				"company_name":        record.CompanyName,
+				"status":              record.Status,
+				"scope":               record.Scope,
+				"settings":            settings,
+				"settings_version":    record.SettingsVersion,
+				"connected_at":        record.ConnectedAt,
+				"disconnected_at":     record.DisconnectedAt,
 			})
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"items": items})
@@ -199,16 +199,16 @@ func bokioCompanyHandler(service *integrations.Service) http.HandlerFunc {
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{
-			"id":                   record.ID,
-			"bokio_connection_id":  record.BokioConnectionID,
-			"bokio_company_id":     record.BokioCompanyID,
-			"company_name":         record.CompanyName,
-			"status":               record.Status,
-			"scope":                record.Scope,
-			"settings":             settings,
-			"settings_version":     record.SettingsVersion,
-			"connected_at":         record.ConnectedAt,
-			"disconnected_at":      record.DisconnectedAt,
+			"id":                  record.ID,
+			"bokio_connection_id": record.BokioConnectionID,
+			"bokio_company_id":    record.BokioCompanyID,
+			"company_name":        record.CompanyName,
+			"status":              record.Status,
+			"scope":               record.Scope,
+			"settings":            settings,
+			"settings_version":    record.SettingsVersion,
+			"connected_at":        record.ConnectedAt,
+			"disconnected_at":     record.DisconnectedAt,
 		})
 	}
 }
@@ -234,6 +234,35 @@ func bokioCompanyChartHandler(service *integrations.Service) http.HandlerFunc {
 	}
 }
 
+func bokioCompanySettingsGetHandler(service *integrations.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		principal, ok := PrincipalFromContext(r.Context())
+		if !ok {
+			writeError(w, http.StatusUnauthorized, fmt.Errorf("missing principal"))
+			return
+		}
+		companyID, err := uuid.Parse(r.PathValue("companyId"))
+		if err != nil {
+			writeError(w, http.StatusBadRequest, fmt.Errorf("invalid company id: %w", err))
+			return
+		}
+		record, settings, err := service.GetBokioConnection(r.Context(), principal.WorkspaceID, companyID)
+		if err != nil {
+			status := http.StatusInternalServerError
+			if err == store.ErrNotFound {
+				status = http.StatusNotFound
+			}
+			writeError(w, status, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{
+			"bokio_company_id": record.BokioCompanyID,
+			"settings":         settings,
+			"settings_version": record.SettingsVersion,
+		})
+	}
+}
+
 func bokioCompanySettingsHandler(service *integrations.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		principal, ok := PrincipalFromContext(r.Context())
@@ -251,7 +280,7 @@ func bokioCompanySettingsHandler(service *integrations.Service) http.HandlerFunc
 			writeError(w, http.StatusBadRequest, err)
 			return
 		}
-		record, err := service.UpdateBokioCompanySettings(r.Context(), principal.WorkspaceID, companyID, settings)
+		record, resolved, err := service.UpdateBokioCompanySettings(r.Context(), principal.WorkspaceID, companyID, settings)
 		if err != nil {
 			writeError(w, http.StatusBadRequest, err)
 			return
@@ -259,6 +288,7 @@ func bokioCompanySettingsHandler(service *integrations.Service) http.HandlerFunc
 		writeJSON(w, http.StatusOK, map[string]any{
 			"status":           "updated",
 			"bokio_company_id": record.BokioCompanyID,
+			"settings":         resolved,
 			"settings_version": record.SettingsVersion,
 		})
 	}
@@ -437,23 +467,23 @@ func pairingPayload(record domain.PairingRecord) map[string]any {
 		"disconnected_at":   record.Pairing.DisconnectedAt,
 		"stripe_account_id": record.StripeConnection.StripeAccountID,
 		"stripe_connection": map[string]any{
-			"id":            record.StripeConnection.ID,
+			"id":             record.StripeConnection.ID,
 			"stripe_user_id": record.StripeConnection.StripeUserID,
-			"livemode":      record.StripeConnection.Livemode,
-			"scope":         record.StripeConnection.Scope,
-			"email":         record.StripeConnection.AccountEmail,
-			"business_name": record.StripeConnection.BusinessName,
-			"country":       record.StripeConnection.Country,
-			"status":        record.StripeConnection.Status,
+			"livemode":       record.StripeConnection.Livemode,
+			"scope":          record.StripeConnection.Scope,
+			"email":          record.StripeConnection.AccountEmail,
+			"business_name":  record.StripeConnection.BusinessName,
+			"country":        record.StripeConnection.Country,
+			"status":         record.StripeConnection.Status,
 		},
 		"bokio_company_id": record.BokioConnection.BokioCompanyID,
 		"bokio_connection": map[string]any{
-			"id":                record.BokioConnection.ID,
+			"id":                  record.BokioConnection.ID,
 			"bokio_connection_id": record.BokioConnection.BokioConnectionID,
-			"company_name":      record.BokioConnection.CompanyName,
-			"scope":             record.BokioConnection.Scope,
-			"status":            record.BokioConnection.Status,
-			"settings_version":  record.BokioConnection.SettingsVersion,
+			"company_name":        record.BokioConnection.CompanyName,
+			"scope":               record.BokioConnection.Scope,
+			"status":              record.BokioConnection.Status,
+			"settings_version":    record.BokioConnection.SettingsVersion,
 		},
 	}
 }

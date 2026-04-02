@@ -37,9 +37,6 @@ func Validate(cfg Config) error {
 	if _, err := time.LoadLocation(cfg.App.Timezone); err != nil {
 		errs = append(errs, fmt.Sprintf("app.timezone is invalid: %v", err))
 	}
-	if _, _, err := cfg.CutoffHourMinute(); err != nil {
-		errs = append(errs, err.Error())
-	}
 	if _, err := time.ParseDuration(cfg.HTTP.ReadTimeout); err != nil {
 		errs = append(errs, fmt.Sprintf("http.read_timeout is invalid: %v", err))
 	}
@@ -101,68 +98,10 @@ func Validate(cfg Config) error {
 			errs = append(errs, "security.data_encryption_key is required when workspace pairings are configured")
 		}
 	}
-	if _, err := time.ParseDuration(cfg.Posting.SchedulerPollInterval); err != nil {
-		errs = append(errs, fmt.Sprintf("posting.scheduler_poll_interval is invalid: %v", err))
-	}
-
+	errs = append(errs, ValidatePostingConfig(cfg.Posting)...)
 	errs = append(errs, ValidateAccountsConfig(cfg.Accounts)...)
-
-	if cfg.Notifications.Resend.Enabled {
-		if strings.TrimSpace(cfg.Notifications.Resend.APIKey) == "" {
-			errs = append(errs, "notifications.resend.api_key is required when enabled")
-		}
-		if strings.TrimSpace(cfg.Notifications.Resend.From) == "" {
-			errs = append(errs, "notifications.resend.from is required when enabled")
-		}
-		if len(cfg.Notifications.Resend.To) == 0 {
-			errs = append(errs, "notifications.resend.to must contain at least one recipient when enabled")
-		}
-		if strings.TrimSpace(cfg.Notifications.Resend.BaseURL) == "" {
-			errs = append(errs, "notifications.resend.base_url is required when enabled")
-		}
-	}
-	if cfg.Filings.Enabled {
-		if cfg.Filings.LeadTimeDays < 0 {
-			errs = append(errs, "filings.lead_time_days must be zero or greater")
-		}
-		if _, _, err := cfg.FilingsSendHourMinute(); err != nil {
-			errs = append(errs, err.Error())
-		}
-		if !cfg.Notifications.Resend.Enabled {
-			errs = append(errs, "notifications.resend.enabled must be true when filings.enabled is true")
-		}
-		if len(cfg.Filings.EmailTo) == 0 {
-			errs = append(errs, "filings.email_to must contain at least one recipient when filings.enabled is true")
-		}
-		if cfg.Filings.OSSUnion.Enabled {
-			if strings.TrimSpace(cfg.Filings.OSSUnion.IdentifierNumber) == "" {
-				errs = append(errs, "filings.oss_union.identifier_number is required when enabled")
-			}
-			if strings.ToUpper(strings.TrimSpace(cfg.Filings.OSSUnion.OriginCountry)) != "SE" {
-				errs = append(errs, "filings.oss_union.origin_country must be SE in v1")
-			}
-			if cfg.Filings.OSSUnion.ZeroSalesPolicy != "reminder_only" {
-				errs = append(errs, "filings.oss_union.zero_sales_policy must be reminder_only in v1")
-			}
-		}
-		if cfg.Filings.PeriodicSummary.Enabled {
-			if strings.TrimSpace(cfg.Filings.PeriodicSummary.ReportingVATNumber) == "" {
-				errs = append(errs, "filings.periodic_summary.reporting_vat_number is required when enabled")
-			}
-			if strings.TrimSpace(cfg.Filings.PeriodicSummary.ResponsibleName) == "" {
-				errs = append(errs, "filings.periodic_summary.responsible_name is required when enabled")
-			}
-			if strings.TrimSpace(cfg.Filings.PeriodicSummary.ResponsiblePhone) == "" {
-				errs = append(errs, "filings.periodic_summary.responsible_phone is required when enabled")
-			}
-			if strings.TrimSpace(cfg.Filings.PeriodicSummary.ResponsibleEmail) == "" {
-				errs = append(errs, "filings.periodic_summary.responsible_email is required when enabled")
-			}
-			if cfg.Filings.PeriodicSummary.Cadence != "monthly" {
-				errs = append(errs, "filings.periodic_summary.cadence must be monthly in v1")
-			}
-		}
-	}
+	errs = append(errs, ValidateNotificationsConfig(cfg.Notifications)...)
+	errs = append(errs, ValidateFilingsConfig(cfg.Filings, cfg.Notifications)...)
 
 	if len(errs) > 0 {
 		sort.Strings(errs)
@@ -170,6 +109,18 @@ func Validate(cfg Config) error {
 	}
 
 	return nil
+}
+
+func ValidatePostingConfig(posting PostingConfig) []string {
+	var errs []string
+	cfg := Config{Posting: posting}
+	if _, _, err := cfg.CutoffHourMinute(); err != nil {
+		errs = append(errs, err.Error())
+	}
+	if _, err := time.ParseDuration(posting.SchedulerPollInterval); err != nil {
+		errs = append(errs, fmt.Sprintf("posting.scheduler_poll_interval is invalid: %v", err))
+	}
+	return errs
 }
 
 func ValidateAccountsConfig(accounts AccountsConfig) []string {
@@ -233,6 +184,75 @@ func ValidateAccountsConfig(accounts AccountsConfig) []string {
 		}
 	}
 
+	return errs
+}
+
+func ValidateNotificationsConfig(notifications NotificationsConfig) []string {
+	var errs []string
+	if notifications.Resend.Enabled {
+		if strings.TrimSpace(notifications.Resend.APIKey) == "" {
+			errs = append(errs, "notifications.resend.api_key is required when enabled")
+		}
+		if strings.TrimSpace(notifications.Resend.From) == "" {
+			errs = append(errs, "notifications.resend.from is required when enabled")
+		}
+		if len(notifications.Resend.To) == 0 {
+			errs = append(errs, "notifications.resend.to must contain at least one recipient when enabled")
+		}
+		if strings.TrimSpace(notifications.Resend.BaseURL) == "" {
+			errs = append(errs, "notifications.resend.base_url is required when enabled")
+		}
+	}
+	return errs
+}
+
+func ValidateFilingsConfig(filings FilingsConfig, notifications NotificationsConfig) []string {
+	var errs []string
+	if !filings.Enabled {
+		return errs
+	}
+
+	if filings.LeadTimeDays < 0 {
+		errs = append(errs, "filings.lead_time_days must be zero or greater")
+	}
+	cfg := Config{Filings: filings}
+	if _, _, err := cfg.FilingsSendHourMinute(); err != nil {
+		errs = append(errs, err.Error())
+	}
+	if !notifications.Resend.Enabled {
+		errs = append(errs, "notifications.resend.enabled must be true when filings.enabled is true")
+	}
+	if len(filings.EmailTo) == 0 {
+		errs = append(errs, "filings.email_to must contain at least one recipient when filings.enabled is true")
+	}
+	if filings.OSSUnion.Enabled {
+		if strings.TrimSpace(filings.OSSUnion.IdentifierNumber) == "" {
+			errs = append(errs, "filings.oss_union.identifier_number is required when enabled")
+		}
+		if strings.ToUpper(strings.TrimSpace(filings.OSSUnion.OriginCountry)) != "SE" {
+			errs = append(errs, "filings.oss_union.origin_country must be SE in v1")
+		}
+		if filings.OSSUnion.ZeroSalesPolicy != "reminder_only" {
+			errs = append(errs, "filings.oss_union.zero_sales_policy must be reminder_only in v1")
+		}
+	}
+	if filings.PeriodicSummary.Enabled {
+		if strings.TrimSpace(filings.PeriodicSummary.ReportingVATNumber) == "" {
+			errs = append(errs, "filings.periodic_summary.reporting_vat_number is required when enabled")
+		}
+		if strings.TrimSpace(filings.PeriodicSummary.ResponsibleName) == "" {
+			errs = append(errs, "filings.periodic_summary.responsible_name is required when enabled")
+		}
+		if strings.TrimSpace(filings.PeriodicSummary.ResponsiblePhone) == "" {
+			errs = append(errs, "filings.periodic_summary.responsible_phone is required when enabled")
+		}
+		if strings.TrimSpace(filings.PeriodicSummary.ResponsibleEmail) == "" {
+			errs = append(errs, "filings.periodic_summary.responsible_email is required when enabled")
+		}
+		if filings.PeriodicSummary.Cadence != "monthly" {
+			errs = append(errs, "filings.periodic_summary.cadence must be monthly in v1")
+		}
+	}
 	return errs
 }
 

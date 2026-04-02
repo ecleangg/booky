@@ -6,6 +6,7 @@ import (
 
 	"github.com/ecleangg/booky/internal/bokio"
 	"github.com/ecleangg/booky/internal/integrations"
+	"github.com/ecleangg/booky/internal/notify"
 	"github.com/google/uuid"
 )
 
@@ -14,6 +15,7 @@ func (s *Service) withRuntime(runtime integrations.RuntimeConfig) *Service {
 	copy := *s
 	copy.Config = cfg
 	copy.Bokio = bokio.NewClient(cfg.Bokio)
+	copy.Notify = notify.NewNotifier(cfg.Notifications)
 	return &copy
 }
 

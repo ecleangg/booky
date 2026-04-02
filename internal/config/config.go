@@ -11,140 +11,140 @@ import (
 )
 
 type Config struct {
-	App           AppConfig           `yaml:"app"`
-	HTTP          HTTPConfig          `yaml:"http"`
-	Admin         AdminConfig         `yaml:"admin"`
-	Auth          AuthConfig          `yaml:"auth"`
-	Security      SecurityConfig      `yaml:"security"`
-	Postgres      PostgresConfig      `yaml:"postgres"`
-	Stripe        StripeConfig        `yaml:"stripe"`
-	Bokio         BokioConfig         `yaml:"bokio"`
-	Posting       PostingConfig       `yaml:"posting"`
-	Accounts      AccountsConfig      `yaml:"accounts"`
-	Notifications NotificationsConfig `yaml:"notifications"`
-	Filings       FilingsConfig       `yaml:"filings"`
+	App           AppConfig           `yaml:"app" json:"app"`
+	HTTP          HTTPConfig          `yaml:"http" json:"http"`
+	Admin         AdminConfig         `yaml:"admin" json:"admin"`
+	Auth          AuthConfig          `yaml:"auth" json:"auth"`
+	Security      SecurityConfig      `yaml:"security" json:"security"`
+	Postgres      PostgresConfig      `yaml:"postgres" json:"postgres"`
+	Stripe        StripeConfig        `yaml:"stripe" json:"stripe"`
+	Bokio         BokioConfig         `yaml:"bokio" json:"bokio"`
+	Posting       PostingConfig       `yaml:"posting" json:"posting"`
+	Accounts      AccountsConfig      `yaml:"accounts" json:"accounts"`
+	Notifications NotificationsConfig `yaml:"notifications" json:"notifications"`
+	Filings       FilingsConfig       `yaml:"filings" json:"filings"`
 }
 
 type AppConfig struct {
-	Env      string `yaml:"env"`
-	Timezone string `yaml:"timezone"`
+	Env      string `yaml:"env" json:"env"`
+	Timezone string `yaml:"timezone" json:"timezone"`
 }
 
 type HTTPConfig struct {
-	ListenAddr   string `yaml:"listen_addr"`
-	ReadTimeout  string `yaml:"read_timeout"`
-	WriteTimeout string `yaml:"write_timeout"`
-	IdleTimeout  string `yaml:"idle_timeout"`
+	ListenAddr   string `yaml:"listen_addr" json:"listen_addr"`
+	ReadTimeout  string `yaml:"read_timeout" json:"read_timeout"`
+	WriteTimeout string `yaml:"write_timeout" json:"write_timeout"`
+	IdleTimeout  string `yaml:"idle_timeout" json:"idle_timeout"`
 }
 
 type AdminConfig struct {
-	Enabled     bool   `yaml:"enabled"`
-	BearerToken string `yaml:"bearer_token"`
+	Enabled     bool   `yaml:"enabled" json:"enabled"`
+	BearerToken string `yaml:"bearer_token" json:"bearer_token"`
 }
 
 type AuthConfig struct {
-	JWT JWTConfig `yaml:"jwt"`
+	JWT JWTConfig `yaml:"jwt" json:"jwt"`
 }
 
 type JWTConfig struct {
-	Enabled        bool   `yaml:"enabled"`
-	Issuer         string `yaml:"issuer"`
-	Audience       string `yaml:"audience"`
-	JWKSURL        string `yaml:"jwks_url"`
-	SubjectClaim   string `yaml:"subject_claim"`
-	WorkspaceClaim string `yaml:"workspace_claim"`
+	Enabled        bool   `yaml:"enabled" json:"enabled"`
+	Issuer         string `yaml:"issuer" json:"issuer"`
+	Audience       string `yaml:"audience" json:"audience"`
+	JWKSURL        string `yaml:"jwks_url" json:"jwks_url"`
+	SubjectClaim   string `yaml:"subject_claim" json:"subject_claim"`
+	WorkspaceClaim string `yaml:"workspace_claim" json:"workspace_claim"`
 }
 
 type SecurityConfig struct {
-	DataEncryptionKey string `yaml:"data_encryption_key"`
+	DataEncryptionKey string `yaml:"data_encryption_key" json:"data_encryption_key"`
 }
 
 type PostgresConfig struct {
-	DSN string `yaml:"dsn"`
+	DSN string `yaml:"dsn" json:"dsn"`
 }
 
 type StripeConfig struct {
-	APIKey               string            `yaml:"api_key"`
-	WebhookSecret        string            `yaml:"webhook_secret"`
-	ConnectWebhookSecret string            `yaml:"connect_webhook_secret"`
-	AccountID            string            `yaml:"account_id"`
-	APIBaseURL           string            `yaml:"api_base_url"`
-	Connect              StripeConnectConfig `yaml:"connect"`
+	APIKey               string              `yaml:"api_key" json:"api_key"`
+	WebhookSecret        string              `yaml:"webhook_secret" json:"webhook_secret"`
+	ConnectWebhookSecret string              `yaml:"connect_webhook_secret" json:"connect_webhook_secret"`
+	AccountID            string              `yaml:"account_id" json:"account_id"`
+	APIBaseURL           string              `yaml:"api_base_url" json:"api_base_url"`
+	Connect              StripeConnectConfig `yaml:"connect" json:"connect"`
 }
 
 type StripeConnectConfig struct {
-	ClientID      string `yaml:"client_id"`
-	RedirectURI   string `yaml:"redirect_uri"`
-	AuthorizeURL  string `yaml:"authorize_url"`
-	TokenURL      string `yaml:"token_url"`
-	DeauthorizeURL string `yaml:"deauthorize_url"`
-	SuccessURL    string `yaml:"success_url"`
-	ErrorURL      string `yaml:"error_url"`
-	Scope         string `yaml:"scope"`
+	ClientID       string `yaml:"client_id" json:"client_id"`
+	RedirectURI    string `yaml:"redirect_uri" json:"redirect_uri"`
+	AuthorizeURL   string `yaml:"authorize_url" json:"authorize_url"`
+	TokenURL       string `yaml:"token_url" json:"token_url"`
+	DeauthorizeURL string `yaml:"deauthorize_url" json:"deauthorize_url"`
+	SuccessURL     string `yaml:"success_url" json:"success_url"`
+	ErrorURL       string `yaml:"error_url" json:"error_url"`
+	Scope          string `yaml:"scope" json:"scope"`
 }
 
 type BokioConfig struct {
-	CompanyID uuid.UUID `yaml:"company_id"`
-	Token     string    `yaml:"token"`
-	BaseURL   string    `yaml:"base_url"`
-	OAuth     BokioOAuthConfig `yaml:"oauth"`
+	CompanyID uuid.UUID        `yaml:"company_id" json:"company_id"`
+	Token     string           `yaml:"token" json:"token"`
+	BaseURL   string           `yaml:"base_url" json:"base_url"`
+	OAuth     BokioOAuthConfig `yaml:"oauth" json:"oauth"`
 }
 
 type BokioOAuthConfig struct {
-	ClientID       string `yaml:"client_id"`
-	ClientSecret   string `yaml:"client_secret"`
-	RedirectURI    string `yaml:"redirect_uri"`
-	AuthorizeURL   string `yaml:"authorize_url"`
-	TokenURL       string `yaml:"token_url"`
-	GeneralBaseURL string `yaml:"general_base_url"`
-	SuccessURL     string `yaml:"success_url"`
-	ErrorURL       string `yaml:"error_url"`
-	Scope          string `yaml:"scope"`
+	ClientID       string `yaml:"client_id" json:"client_id"`
+	ClientSecret   string `yaml:"client_secret" json:"client_secret"`
+	RedirectURI    string `yaml:"redirect_uri" json:"redirect_uri"`
+	AuthorizeURL   string `yaml:"authorize_url" json:"authorize_url"`
+	TokenURL       string `yaml:"token_url" json:"token_url"`
+	GeneralBaseURL string `yaml:"general_base_url" json:"general_base_url"`
+	SuccessURL     string `yaml:"success_url" json:"success_url"`
+	ErrorURL       string `yaml:"error_url" json:"error_url"`
+	Scope          string `yaml:"scope" json:"scope"`
 }
 
 type PostingConfig struct {
-	CutoffTime            string `yaml:"cutoff_time"`
-	SchedulerEnabled      bool   `yaml:"scheduler_enabled"`
-	SchedulerPollInterval string `yaml:"scheduler_poll_interval"`
-	AutoPostUnknownToOBS  bool   `yaml:"auto_post_unknown_to_obs"`
-	RoundingToleranceOre  int64  `yaml:"rounding_tolerance_ore"`
+	CutoffTime            string `yaml:"cutoff_time" json:"cutoff_time"`
+	SchedulerEnabled      bool   `yaml:"scheduler_enabled" json:"scheduler_enabled"`
+	SchedulerPollInterval string `yaml:"scheduler_poll_interval" json:"scheduler_poll_interval"`
+	AutoPostUnknownToOBS  bool   `yaml:"auto_post_unknown_to_obs" json:"auto_post_unknown_to_obs"`
+	RoundingToleranceOre  int64  `yaml:"rounding_tolerance_ore" json:"rounding_tolerance_ore"`
 }
 
 type AccountsConfig struct {
-	StripeReceivable        int                          `yaml:"stripe_receivable"`
-	Bank                    int                          `yaml:"bank"`
-	Dispute                 int                          `yaml:"dispute"`
-	FallbackOBS             int                          `yaml:"fallback_obs"`
-	Rounding                int                          `yaml:"rounding"`
-	StripeBalanceByCurrency map[string]int               `yaml:"stripe_balance_by_currency"`
-	StripeFees              StripeFeesConfig             `yaml:"stripe_fees"`
-	SalesByMarket           map[string]SalesMarketConfig `yaml:"sales_by_market"`
-	OtherCountriesDefault   *SalesMarketConfig           `yaml:"other_countries_default"`
+	StripeReceivable        int                          `yaml:"stripe_receivable" json:"stripe_receivable"`
+	Bank                    int                          `yaml:"bank" json:"bank"`
+	Dispute                 int                          `yaml:"dispute" json:"dispute"`
+	FallbackOBS             int                          `yaml:"fallback_obs" json:"fallback_obs"`
+	Rounding                int                          `yaml:"rounding" json:"rounding"`
+	StripeBalanceByCurrency map[string]int               `yaml:"stripe_balance_by_currency" json:"stripe_balance_by_currency"`
+	StripeFees              StripeFeesConfig             `yaml:"stripe_fees" json:"stripe_fees"`
+	SalesByMarket           map[string]SalesMarketConfig `yaml:"sales_by_market" json:"sales_by_market"`
+	OtherCountriesDefault   *SalesMarketConfig           `yaml:"other_countries_default" json:"other_countries_default"`
 }
 
 type StripeFeesConfig struct {
-	Expense   int `yaml:"expense"`
-	InputVAT  int `yaml:"input_vat"`
-	OutputVAT int `yaml:"output_vat"`
+	Expense   int `yaml:"expense" json:"expense"`
+	InputVAT  int `yaml:"input_vat" json:"input_vat"`
+	OutputVAT int `yaml:"output_vat" json:"output_vat"`
 }
 
 type SalesMarketConfig struct {
-	Revenue        int     `yaml:"revenue"`
-	OutputVAT      int     `yaml:"output_vat"`
-	VATRatePercent float64 `yaml:"vat_rate_percent"`
+	Revenue        int     `yaml:"revenue" json:"revenue"`
+	OutputVAT      int     `yaml:"output_vat" json:"output_vat"`
+	VATRatePercent float64 `yaml:"vat_rate_percent" json:"vat_rate_percent"`
 }
 
 type NotificationsConfig struct {
-	Resend ResendConfig `yaml:"resend"`
+	Resend ResendConfig `yaml:"resend" json:"resend"`
 }
 
 type ResendConfig struct {
-	Enabled       bool     `yaml:"enabled"`
-	APIKey        string   `yaml:"api_key"`
-	From          string   `yaml:"from"`
-	To            []string `yaml:"to"`
-	BaseURL       string   `yaml:"base_url"`
-	SubjectPrefix string   `yaml:"subject_prefix"`
+	Enabled       bool     `yaml:"enabled" json:"enabled"`
+	APIKey        string   `yaml:"api_key" json:"api_key"`
+	From          string   `yaml:"from" json:"from"`
+	To            []string `yaml:"to" json:"to"`
+	BaseURL       string   `yaml:"base_url" json:"base_url"`
+	SubjectPrefix string   `yaml:"subject_prefix" json:"subject_prefix"`
 }
 
 func Load(path string) (Config, error) {

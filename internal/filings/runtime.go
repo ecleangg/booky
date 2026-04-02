@@ -5,12 +5,14 @@ import (
 	"time"
 
 	"github.com/ecleangg/booky/internal/integrations"
+	"github.com/ecleangg/booky/internal/notify"
 	"github.com/google/uuid"
 )
 
 func (s *Service) withRuntime(runtime integrations.RuntimeConfig) *Service {
 	copy := *s
 	copy.Config = runtime.Apply(s.Config)
+	copy.Notify = notify.NewNotifier(copy.Config.Notifications)
 	return &copy
 }
 

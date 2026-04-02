@@ -2,6 +2,7 @@ package pdf
 
 import (
 	"fmt"
+	"math"
 	"strings"
 
 	"github.com/ecleangg/booky/internal/domain"
@@ -67,5 +68,20 @@ func sourceAmountLabel(fact domain.AccountingFact) string {
 	if currency == "" {
 		return fmt.Sprintf("%d", *fact.SourceAmountMinor)
 	}
-	return fmt.Sprintf("%d %s", *fact.SourceAmountMinor, currency)
+	return fmt.Sprintf("%s %s", formatMinorAmount(*fact.SourceAmountMinor, currency), currency)
+}
+
+func formatMinorAmount(amountMinor int64, currency string) string {
+	exponent := currencyExponent(currency)
+	divisor := math.Pow10(exponent)
+	return fmt.Sprintf("%.*f", exponent, float64(amountMinor)/divisor)
+}
+
+func currencyExponent(currency string) int {
+	switch strings.ToUpper(strings.TrimSpace(currency)) {
+	case "BIF", "CLP", "DJF", "GNF", "JPY", "KMF", "KRW", "MGA", "PYG", "RWF", "UGX", "VND", "VUV", "XAF", "XOF", "XPF":
+		return 0
+	default:
+		return 2
+	}
 }

@@ -18,6 +18,8 @@ type SaleInput struct {
 	AvailableOn                *time.Time
 	SourceCurrency             string
 	GrossMinor                 int64
+	FeeCurrency                string
+	FeeMinor                   int64
 	GrossSEKOre                int64
 	FeeSEKOre                  int64
 	MarketCode                 string

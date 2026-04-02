@@ -29,14 +29,22 @@ func BuildSaleFacts(input SaleInput) ([]domain.AccountingFact, error) {
 	}
 
 	if input.FeeSEKOre > 0 {
+		feeCurrency := input.FeeCurrency
+		if feeCurrency == "" {
+			feeCurrency = input.SourceCurrency
+		}
+		feeMinor := input.FeeMinor
+		if feeMinor == 0 {
+			feeMinor = input.GrossMinor
+		}
 		facts = append(facts,
-			newFact(input.BokioCompanyID, input.StripeAccountID, input.SourceGroupPrefix+":fee", input.SourceObjectType, input.SourceObjectID, input.StripeBalanceTransactionID, input.StripeEventID, "stripe_fee_expense", input.ChargeDate, input.MarketCode, input.VATTreatment, input.SourceCurrency, input.GrossMinor, input.FeeSEKOre, input.FeeExpenseAccount, domain.DirectionDebit, domain.FactStatusPending, nil, payload),
-			newFact(input.BokioCompanyID, input.StripeAccountID, input.SourceGroupPrefix+":fee", input.SourceObjectType, input.SourceObjectID, input.StripeBalanceTransactionID, input.StripeEventID, "stripe_fee_balance", input.ChargeDate, input.MarketCode, input.VATTreatment, input.SourceCurrency, input.GrossMinor, input.FeeSEKOre, input.StripeBalanceAccount, domain.DirectionCredit, domain.FactStatusPending, nil, payload),
+			newFact(input.BokioCompanyID, input.StripeAccountID, input.SourceGroupPrefix+":fee", input.SourceObjectType, input.SourceObjectID, input.StripeBalanceTransactionID, input.StripeEventID, "stripe_fee_expense", input.ChargeDate, input.MarketCode, input.VATTreatment, feeCurrency, feeMinor, input.FeeSEKOre, input.FeeExpenseAccount, domain.DirectionDebit, domain.FactStatusPending, nil, payload),
+			newFact(input.BokioCompanyID, input.StripeAccountID, input.SourceGroupPrefix+":fee", input.SourceObjectType, input.SourceObjectID, input.StripeBalanceTransactionID, input.StripeEventID, "stripe_fee_balance", input.ChargeDate, input.MarketCode, input.VATTreatment, feeCurrency, feeMinor, input.FeeSEKOre, input.StripeBalanceAccount, domain.DirectionCredit, domain.FactStatusPending, nil, payload),
 		)
 		if input.FeeReverseVATSEKOre > 0 {
 			facts = append(facts,
-				newFact(input.BokioCompanyID, input.StripeAccountID, input.SourceGroupPrefix+":fee", input.SourceObjectType, input.SourceObjectID, input.StripeBalanceTransactionID, input.StripeEventID, "stripe_fee_input_vat", input.ChargeDate, input.MarketCode, input.VATTreatment, input.SourceCurrency, input.GrossMinor, input.FeeReverseVATSEKOre, input.FeeInputVATAccount, domain.DirectionDebit, domain.FactStatusPending, nil, payload),
-				newFact(input.BokioCompanyID, input.StripeAccountID, input.SourceGroupPrefix+":fee", input.SourceObjectType, input.SourceObjectID, input.StripeBalanceTransactionID, input.StripeEventID, "stripe_fee_output_vat", input.ChargeDate, input.MarketCode, input.VATTreatment, input.SourceCurrency, input.GrossMinor, input.FeeReverseVATSEKOre, input.FeeOutputVATAccount, domain.DirectionCredit, domain.FactStatusPending, nil, payload),
+				newFact(input.BokioCompanyID, input.StripeAccountID, input.SourceGroupPrefix+":fee", input.SourceObjectType, input.SourceObjectID, input.StripeBalanceTransactionID, input.StripeEventID, "stripe_fee_input_vat", input.ChargeDate, input.MarketCode, input.VATTreatment, feeCurrency, feeMinor, input.FeeReverseVATSEKOre, input.FeeInputVATAccount, domain.DirectionDebit, domain.FactStatusPending, nil, payload),
+				newFact(input.BokioCompanyID, input.StripeAccountID, input.SourceGroupPrefix+":fee", input.SourceObjectType, input.SourceObjectID, input.StripeBalanceTransactionID, input.StripeEventID, "stripe_fee_output_vat", input.ChargeDate, input.MarketCode, input.VATTreatment, feeCurrency, feeMinor, input.FeeReverseVATSEKOre, input.FeeOutputVATAccount, domain.DirectionCredit, domain.FactStatusPending, nil, payload),
 			)
 		}
 	}

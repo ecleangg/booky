@@ -51,8 +51,14 @@ func TestFormatHelpers(t *testing.T) {
 	if got := sourceObjectLabel(fact); got != "charge:ch_123" {
 		t.Fatalf("unexpected source object label %q", got)
 	}
-	if got := sourceAmountLabel(fact); got != "1200 EUR" {
+	if got := sourceAmountLabel(fact); got != "12.00 EUR" {
 		t.Fatalf("unexpected source amount label %q", got)
+	}
+	if got := formatMinorAmount(230, "SEK"); got != "2.30" {
+		t.Fatalf("unexpected formatted minor amount %q", got)
+	}
+	if got := formatMinorAmount(100, "JPY"); got != "100" {
+		t.Fatalf("unexpected zero-decimal amount %q", got)
 	}
 	if got := splitCellLines(newTestPDF(), 20, strings.Repeat("abc ", 20)); len(got) < 2 {
 		t.Fatalf("expected wrapped lines, got %#v", got)

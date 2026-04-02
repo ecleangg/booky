@@ -169,6 +169,52 @@ func TestBuildReviewTransferFactsCreatesBalancedNeedsReviewPair(t *testing.T) {
 	}
 }
 
+func TestBuildSaleFactsUsesFeeMinorAndFeeCurrencyForFeeFacts(t *testing.T) {
+	facts, err := BuildSaleFacts(SaleInput{
+		BokioCompanyID:             uuid.New(),
+		StripeAccountID:            "acct_123",
+		SourceObjectType:           "charge",
+		SourceObjectID:             "ch_123",
+		SourceGroupPrefix:          "charge:ch_123",
+		StripeBalanceTransactionID: "txn_123",
+		StripeEventID:              "evt_123",
+		ChargeDate:                 time.Date(2026, 4, 2, 0, 0, 0, 0, time.UTC),
+		SourceCurrency:             "USD",
+		GrossMinor:                 100,
+		FeeCurrency:                "SEK",
+		FeeMinor:                   230,
+		GrossSEKOre:                950,
+		FeeSEKOre:                  230,
+		ReceivableAccount:          1580,
+		StripeBalanceAccount:       1980,
+		FeeExpenseAccount:          4535,
+		RevenueAccount:             3001,
+		RevenueSEKOre:              950,
+		Payload:                    map[string]any{"id": "ch_123"},
+	})
+	if err != nil {
+		t.Fatalf("BuildSaleFacts returned error: %v", err)
+	}
+
+	var feeFacts []domain.AccountingFact
+	for _, fact := range facts {
+		if fact.SourceGroupID == "charge:ch_123:fee" {
+			feeFacts = append(feeFacts, fact)
+		}
+	}
+	if len(feeFacts) != 2 {
+		t.Fatalf("expected 2 fee facts, got %d", len(feeFacts))
+	}
+	for _, fact := range feeFacts {
+		if fact.SourceCurrency == nil || *fact.SourceCurrency != "SEK" {
+			t.Fatalf("expected fee fact currency SEK, got %#v", fact.SourceCurrency)
+		}
+		if fact.SourceAmountMinor == nil || *fact.SourceAmountMinor != 230 {
+			t.Fatalf("expected fee fact source amount 230, got %#v", fact.SourceAmountMinor)
+		}
+	}
+}
+
 func testConfig() config.Config {
 	return config.Config{
 		Accounts: config.AccountsConfig{

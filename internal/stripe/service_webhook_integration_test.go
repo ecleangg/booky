@@ -18,7 +18,7 @@ func TestHandleWebhookStoresAndDeduplicatesUnknownEvent(t *testing.T) {
 	cfg := testutil.TestConfig()
 	cfg.Stripe.WebhookSecret = "whsec_test"
 
-	service := NewService(cfg, repo, NewClient(cfg.Stripe), nil, nil, nil, stripeTestLogger())
+	service := NewService(cfg, repo, NewClient(cfg.Stripe), nil, nil, nil, nil, stripeTestLogger())
 	payload := []byte(`{"id":"evt_unknown","type":"customer.created","created":1775068800,"livemode":false,"data":{"object":{"id":"cus_123"}}}`)
 	signature := signedHeader(payload, cfg.Stripe.WebhookSecret, time.Now().Unix())
 
@@ -86,7 +86,7 @@ func TestRebindFactTaxCaseIDs(t *testing.T) {
 }
 
 func TestBuildFromEventIgnoresInvoiceFinalized(t *testing.T) {
-	service := NewService(testutil.TestConfig(), nil, nil, nil, nil, nil, stripeTestLogger())
+	service := NewService(testutil.TestConfig(), nil, nil, nil, nil, nil, nil, stripeTestLogger())
 
 	result, err := service.buildFromEvent(context.Background(), Event{
 		ID:   "evt_123",
@@ -97,6 +97,100 @@ func TestBuildFromEventIgnoresInvoiceFinalized(t *testing.T) {
 	}
 	if len(result.Snapshots) != 0 || len(result.BalanceTxs) != 0 || len(result.Facts) != 0 || len(result.TaxCases) != 0 {
 		t.Fatalf("expected invoice.finalized to be ignored, got %#v", result)
+	}
+}
+
+func TestHandleConnectWebhookDisconnectsPairingOnDeauthorization(t *testing.T) {
+	repo, _ := testutil.NewTestRepository(t)
+	cfg := testutil.TestConfig()
+	cfg.Stripe.ConnectWebhookSecret = "whsec_connect"
+
+	now := time.Now().UTC()
+	stripeConn := domain.StripeConnection{
+		ID:              uuid.New(),
+		WorkspaceID:     "ws_123",
+		StripeAccountID: "acct_123",
+		StripeUserID:    "acct_123",
+		Livemode:        false,
+		Scope:           "read_write",
+		RawAccount:      []byte(`{"id":"acct_123"}`),
+		Status:          domain.ConnectionStatusActive,
+		ConnectedAt:     now,
+		CreatedAt:       now,
+	}
+	bokioConn := domain.BokioConnection{
+		ID:                 uuid.New(),
+		WorkspaceID:        "ws_123",
+		BokioConnectionID:  uuid.New(),
+		BokioCompanyID:     uuid.New(),
+		CompanyName:        "Acme AB",
+		AccessTokenCipher:  "ciphertext",
+		RefreshTokenCipher: "refresh",
+		TokenExpiresAt:     now.Add(1 * time.Hour),
+		Scope:              "company-information:read",
+		Settings:           []byte(`{}`),
+		SettingsVersion:    1,
+		Status:             domain.ConnectionStatusActive,
+		ConnectedAt:        now,
+		CreatedAt:          now,
+	}
+	pairing := domain.WorkspacePairing{
+		ID:                 uuid.New(),
+		WorkspaceID:        "ws_123",
+		StripeConnectionID: stripeConn.ID,
+		BokioConnectionID:  bokioConn.ID,
+		Status:             domain.PairingStatusActive,
+		CreatedAt:          now,
+	}
+
+	if err := repo.InTx(context.Background(), func(q *store.Queries) error {
+		if err := q.SaveStripeConnection(context.Background(), stripeConn); err != nil {
+			return err
+		}
+		if err := q.SaveBokioConnection(context.Background(), bokioConn); err != nil {
+			return err
+		}
+		return q.SaveWorkspacePairing(context.Background(), pairing)
+	}); err != nil {
+		t.Fatalf("seed integration records: %v", err)
+	}
+
+	service := NewService(cfg, repo, NewClient(cfg.Stripe), nil, nil, nil, nil, stripeTestLogger())
+	payload := []byte(`{"id":"evt_deauth","type":"account.application.deauthorized","created":1775068800,"livemode":false,"account":"acct_123","data":{"object":{"id":"acct_123"}}}`)
+	signature := signedHeader(payload, cfg.Stripe.ConnectWebhookSecret, time.Now().Unix())
+
+	if err := service.HandleConnectWebhook(context.Background(), payload, signature); err != nil {
+		t.Fatalf("HandleConnectWebhook returned error: %v", err)
+	}
+
+	updatedStripeConn, err := repo.Queries().GetStripeConnectionByID(context.Background(), stripeConn.ID)
+	if err != nil {
+		t.Fatalf("GetStripeConnectionByID returned error: %v", err)
+	}
+	if updatedStripeConn.Status != domain.ConnectionStatusDisconnected {
+		t.Fatalf("expected stripe connection to be disconnected, got %q", updatedStripeConn.Status)
+	}
+	if updatedStripeConn.DisconnectedAt == nil {
+		t.Fatal("expected stripe connection to have disconnected_at set")
+	}
+
+	updatedPairing, err := repo.Queries().GetWorkspacePairingRecord(context.Background(), pairing.ID)
+	if err != nil {
+		t.Fatalf("GetWorkspacePairingRecord returned error: %v", err)
+	}
+	if updatedPairing.Pairing.Status != domain.PairingStatusDisconnected {
+		t.Fatalf("expected pairing to be disconnected, got %q", updatedPairing.Pairing.Status)
+	}
+	if updatedPairing.Pairing.DisconnectedAt == nil {
+		t.Fatal("expected pairing to have disconnected_at set")
+	}
+
+	event, err := repo.Queries().GetWebhookEvent(context.Background(), "evt_deauth")
+	if err != nil {
+		t.Fatalf("GetWebhookEvent returned error: %v", err)
+	}
+	if event.ProcessedAt == nil {
+		t.Fatal("expected deauthorization webhook to be marked processed")
 	}
 }
 

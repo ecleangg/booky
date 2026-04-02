@@ -15,7 +15,7 @@ import (
 func TestRunPeriodSendsZeroReminderForEmptyOSSPeriod(t *testing.T) {
 	repo, _ := testutil.NewTestRepository(t)
 	notifier := &testutil.RecordingNotifier{}
-	service := NewService(testutil.TestConfig(), repo, notifier, testLogger())
+	service := NewService(testutil.TestConfig(), repo, notifier, nil, testLogger())
 
 	export, err := service.RunPeriod(context.Background(), domain.FilingKindOSSUnion, "2026-Q1")
 	if err != nil {
@@ -48,7 +48,7 @@ func TestRunPeriodSendsZeroReminderForEmptyOSSPeriod(t *testing.T) {
 func TestRunPeriodStoresRenderedExportAndSkipsUnchangedRevision(t *testing.T) {
 	repo, _ := testutil.NewTestRepository(t)
 	notifier := &testutil.RecordingNotifier{}
-	service := NewService(testutil.TestConfig(), repo, notifier, testLogger())
+	service := NewService(testutil.TestConfig(), repo, notifier, nil, testLogger())
 	companyID := testutil.TestConfig().Bokio.CompanyID
 
 	entry := domain.OSSUnionEntry{

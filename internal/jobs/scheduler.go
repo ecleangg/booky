@@ -11,6 +11,7 @@ import (
 	"github.com/ecleangg/booky/internal/accounting"
 	"github.com/ecleangg/booky/internal/config"
 	"github.com/ecleangg/booky/internal/filings"
+	"github.com/ecleangg/booky/internal/integrations"
 	"github.com/ecleangg/booky/internal/notify"
 )
 
@@ -18,14 +19,15 @@ type Scheduler struct {
 	Config  config.Config
 	Service *accounting.Service
 	Filings *filings.Service
+	Tenants *integrations.Service
 	Logger  *slog.Logger
 }
 
-func NewScheduler(cfg config.Config, service *accounting.Service, filingsService *filings.Service, logger *slog.Logger) *Scheduler {
+func NewScheduler(cfg config.Config, service *accounting.Service, filingsService *filings.Service, tenants *integrations.Service, logger *slog.Logger) *Scheduler {
 	if logger == nil {
 		logger = slog.Default()
 	}
-	return &Scheduler{Config: cfg, Service: service, Filings: filingsService, Logger: logger}
+	return &Scheduler{Config: cfg, Service: service, Filings: filingsService, Tenants: tenants, Logger: logger}
 }
 
 func (s *Scheduler) Run(ctx context.Context) error {
@@ -68,7 +70,7 @@ func (s *Scheduler) tryRun(ctx context.Context) {
 	}
 
 	for _, postingDate := range toRun {
-		if err := s.Service.RunDailyClose(ctx, postingDate); err != nil && !shouldIgnoreScheduleError(err) {
+		if err := s.runDailyClose(ctx, postingDate); err != nil && !shouldIgnoreScheduleError(err) {
 			s.Logger.Error("scheduled daily close failed", "posting_date", postingDate.Format("2006-01-02"), "error", err)
 			date := postingDate
 			s.notifySchedulerIssue(ctx, notify.SeverityError, notify.CategorySchedulerFailure, fmt.Sprintf("Scheduled daily close failed for %s", postingDate.Format("2006-01-02")), []string{
@@ -78,7 +80,7 @@ func (s *Scheduler) tryRun(ctx context.Context) {
 		}
 	}
 	if s.Filings != nil && s.Filings.Enabled() {
-		if err := s.Filings.EvaluateDuePeriods(ctx, now); err != nil && !shouldIgnoreScheduleError(err) {
+		if err := s.evaluateDuePeriods(ctx, now); err != nil && !shouldIgnoreScheduleError(err) {
 			s.Logger.Error("scheduled filing evaluation failed", "error", err)
 			s.notifySchedulerIssue(ctx, notify.SeverityError, notify.CategorySchedulerFailure, "Scheduled filing evaluation failed", []string{
 				fmt.Sprintf("Automatic filing evaluation failed: %s", err.Error()),
@@ -86,6 +88,40 @@ func (s *Scheduler) tryRun(ctx context.Context) {
 			})
 		}
 	}
+}
+
+func (s *Scheduler) runDailyClose(ctx context.Context, postingDate time.Time) error {
+	if s.Tenants == nil || !s.Tenants.Enabled() {
+		return s.Service.RunDailyClose(ctx, postingDate)
+	}
+	runtimes, err := s.Tenants.ListActiveRuntimes(ctx)
+	if err != nil {
+		return err
+	}
+	var errs []error
+	for _, runtime := range runtimes {
+		if err := s.Service.RunDailyCloseForCompany(ctx, runtime.BokioCompanyID, postingDate); err != nil && !shouldIgnoreScheduleError(err) {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
+}
+
+func (s *Scheduler) evaluateDuePeriods(ctx context.Context, now time.Time) error {
+	if s.Tenants == nil || !s.Tenants.Enabled() {
+		return s.Filings.EvaluateDuePeriods(ctx, now)
+	}
+	runtimes, err := s.Tenants.ListActiveRuntimes(ctx)
+	if err != nil {
+		return err
+	}
+	var errs []error
+	for _, runtime := range runtimes {
+		if err := s.Filings.EvaluateDuePeriodsForCompany(ctx, runtime.BokioCompanyID, now); err != nil && !shouldIgnoreScheduleError(err) {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
 }
 
 func shouldIgnoreScheduleError(err error) bool {

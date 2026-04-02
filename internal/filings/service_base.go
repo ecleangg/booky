@@ -7,6 +7,7 @@ import (
 
 	"github.com/ecleangg/booky/internal/config"
 	"github.com/ecleangg/booky/internal/domain"
+	"github.com/ecleangg/booky/internal/integrations"
 	"github.com/ecleangg/booky/internal/notify"
 	"github.com/ecleangg/booky/internal/store"
 	"github.com/ecleangg/booky/internal/support"
@@ -16,6 +17,7 @@ type Service struct {
 	Config config.Config
 	Repo   *store.Repository
 	Notify notify.Notifier
+	Tenants *integrations.Service
 	Logger *slog.Logger
 }
 
@@ -26,7 +28,7 @@ type PeriodStatus struct {
 	LatestExport  *domain.FilingExport `json:"latest_export,omitempty"`
 }
 
-func NewService(cfg config.Config, repo *store.Repository, notifier notify.Notifier, logger *slog.Logger) *Service {
+func NewService(cfg config.Config, repo *store.Repository, notifier notify.Notifier, tenants *integrations.Service, logger *slog.Logger) *Service {
 	if logger == nil {
 		logger = slog.Default()
 	}
@@ -34,6 +36,7 @@ func NewService(cfg config.Config, repo *store.Repository, notifier notify.Notif
 		Config: cfg,
 		Repo:   repo,
 		Notify: notifier,
+		Tenants: tenants,
 		Logger: logger,
 	}
 }

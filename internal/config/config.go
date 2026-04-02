@@ -14,6 +14,8 @@ type Config struct {
 	App           AppConfig           `yaml:"app"`
 	HTTP          HTTPConfig          `yaml:"http"`
 	Admin         AdminConfig         `yaml:"admin"`
+	Auth          AuthConfig          `yaml:"auth"`
+	Security      SecurityConfig      `yaml:"security"`
 	Postgres      PostgresConfig      `yaml:"postgres"`
 	Stripe        StripeConfig        `yaml:"stripe"`
 	Bokio         BokioConfig         `yaml:"bokio"`
@@ -40,21 +42,64 @@ type AdminConfig struct {
 	BearerToken string `yaml:"bearer_token"`
 }
 
+type AuthConfig struct {
+	JWT JWTConfig `yaml:"jwt"`
+}
+
+type JWTConfig struct {
+	Enabled        bool   `yaml:"enabled"`
+	Issuer         string `yaml:"issuer"`
+	Audience       string `yaml:"audience"`
+	JWKSURL        string `yaml:"jwks_url"`
+	SubjectClaim   string `yaml:"subject_claim"`
+	WorkspaceClaim string `yaml:"workspace_claim"`
+}
+
+type SecurityConfig struct {
+	DataEncryptionKey string `yaml:"data_encryption_key"`
+}
+
 type PostgresConfig struct {
 	DSN string `yaml:"dsn"`
 }
 
 type StripeConfig struct {
-	APIKey        string `yaml:"api_key"`
-	WebhookSecret string `yaml:"webhook_secret"`
-	AccountID     string `yaml:"account_id"`
-	APIBaseURL    string `yaml:"api_base_url"`
+	APIKey               string            `yaml:"api_key"`
+	WebhookSecret        string            `yaml:"webhook_secret"`
+	ConnectWebhookSecret string            `yaml:"connect_webhook_secret"`
+	AccountID            string            `yaml:"account_id"`
+	APIBaseURL           string            `yaml:"api_base_url"`
+	Connect              StripeConnectConfig `yaml:"connect"`
+}
+
+type StripeConnectConfig struct {
+	ClientID      string `yaml:"client_id"`
+	RedirectURI   string `yaml:"redirect_uri"`
+	AuthorizeURL  string `yaml:"authorize_url"`
+	TokenURL      string `yaml:"token_url"`
+	DeauthorizeURL string `yaml:"deauthorize_url"`
+	SuccessURL    string `yaml:"success_url"`
+	ErrorURL      string `yaml:"error_url"`
+	Scope         string `yaml:"scope"`
 }
 
 type BokioConfig struct {
 	CompanyID uuid.UUID `yaml:"company_id"`
 	Token     string    `yaml:"token"`
 	BaseURL   string    `yaml:"base_url"`
+	OAuth     BokioOAuthConfig `yaml:"oauth"`
+}
+
+type BokioOAuthConfig struct {
+	ClientID       string `yaml:"client_id"`
+	ClientSecret   string `yaml:"client_secret"`
+	RedirectURI    string `yaml:"redirect_uri"`
+	AuthorizeURL   string `yaml:"authorize_url"`
+	TokenURL       string `yaml:"token_url"`
+	GeneralBaseURL string `yaml:"general_base_url"`
+	SuccessURL     string `yaml:"success_url"`
+	ErrorURL       string `yaml:"error_url"`
+	Scope          string `yaml:"scope"`
 }
 
 type PostingConfig struct {
@@ -145,8 +190,46 @@ func setDefaults(cfg *Config) {
 	if cfg.Stripe.APIBaseURL == "" {
 		cfg.Stripe.APIBaseURL = "https://api.stripe.com"
 	}
+	if cfg.Stripe.Connect.AuthorizeURL == "" {
+		cfg.Stripe.Connect.AuthorizeURL = "https://connect.stripe.com/oauth/authorize"
+	}
+	if cfg.Stripe.Connect.TokenURL == "" {
+		cfg.Stripe.Connect.TokenURL = "https://connect.stripe.com/oauth/token"
+	}
+	if cfg.Stripe.Connect.DeauthorizeURL == "" {
+		cfg.Stripe.Connect.DeauthorizeURL = "https://connect.stripe.com/oauth/deauthorize"
+	}
+	if cfg.Stripe.Connect.Scope == "" {
+		cfg.Stripe.Connect.Scope = "read_write"
+	}
 	if cfg.Bokio.BaseURL == "" {
 		cfg.Bokio.BaseURL = "https://api.bokio.se/v1"
+	}
+	if cfg.Bokio.OAuth.GeneralBaseURL == "" {
+		cfg.Bokio.OAuth.GeneralBaseURL = "https://api.bokio.se/v1"
+	}
+	if cfg.Bokio.OAuth.AuthorizeURL == "" {
+		cfg.Bokio.OAuth.AuthorizeURL = "https://api.bokio.se/v1/authorize"
+	}
+	if cfg.Bokio.OAuth.TokenURL == "" {
+		cfg.Bokio.OAuth.TokenURL = "https://api.bokio.se/v1/token"
+	}
+	if cfg.Bokio.OAuth.Scope == "" {
+		cfg.Bokio.OAuth.Scope = strings.Join([]string{
+			"company-information:read",
+			"chart-of-accounts:read",
+			"fiscal-years:read",
+			"journal-entries:read",
+			"journal-entries:write",
+			"uploads:read",
+			"uploads:write",
+		}, " ")
+	}
+	if cfg.Auth.JWT.SubjectClaim == "" {
+		cfg.Auth.JWT.SubjectClaim = "sub"
+	}
+	if cfg.Auth.JWT.WorkspaceClaim == "" {
+		cfg.Auth.JWT.WorkspaceClaim = "workspace_id"
 	}
 	if cfg.Posting.CutoffTime == "" {
 		cfg.Posting.CutoffTime = "23:59"
@@ -187,6 +270,16 @@ func setDefaults(cfg *Config) {
 	if cfg.Filings.PeriodicSummary.Cadence == "" {
 		cfg.Filings.PeriodicSummary.Cadence = "monthly"
 	}
+}
+
+func (c Config) LegacyRuntimeEnabled() bool {
+	return c.Bokio.CompanyID != uuid.Nil && strings.TrimSpace(c.Bokio.Token) != ""
+}
+
+func (c Config) WorkspacePairingsEnabled() bool {
+	return c.Auth.JWT.Enabled ||
+		strings.TrimSpace(c.Stripe.Connect.ClientID) != "" ||
+		strings.TrimSpace(c.Bokio.OAuth.ClientID) != ""
 }
 
 func (c Config) Location() (*time.Location, error) {

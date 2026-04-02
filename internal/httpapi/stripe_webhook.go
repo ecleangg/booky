@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"errors"
 	"io"
 	"log/slog"
@@ -10,6 +11,18 @@ import (
 )
 
 func stripeWebhookHandler(logger *slog.Logger, service *stripe.Service) http.HandlerFunc {
+	return stripeWebhookWithRunner(logger, service, func(ctx context.Context, payload []byte, signature string) error {
+		return service.HandleWebhook(ctx, payload, signature)
+	})
+}
+
+func stripeConnectWebhookHandler(logger *slog.Logger, service *stripe.Service) http.HandlerFunc {
+	return stripeWebhookWithRunner(logger, service, func(ctx context.Context, payload []byte, signature string) error {
+		return service.HandleConnectWebhook(ctx, payload, signature)
+	})
+}
+
+func stripeWebhookWithRunner(logger *slog.Logger, service *stripe.Service, run func(context.Context, []byte, string) error) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			methodNotAllowed(w, http.MethodPost)
@@ -27,7 +40,7 @@ func stripeWebhookHandler(logger *slog.Logger, service *stripe.Service) http.Han
 		}
 
 		signature := r.Header.Get("Stripe-Signature")
-		if err := service.HandleWebhook(r.Context(), payload, signature); err != nil {
+		if err := run(r.Context(), payload, signature); err != nil {
 			logger.Error("stripe webhook failed", "error", err)
 			status := http.StatusInternalServerError
 			if errors.Is(err, stripe.ErrWebhookSignatureInvalid) ||

@@ -27,7 +27,11 @@ var (
 )
 
 func (c *Client) VerifyWebhook(payload []byte, signatureHeader string) error {
-	if c.webhookSecret == "" {
+	return c.VerifyWebhookWithSecret(payload, signatureHeader, c.webhookSecret)
+}
+
+func (c *Client) VerifyWebhookWithSecret(payload []byte, signatureHeader, secret string) error {
+	if secret == "" {
 		return fmt.Errorf("stripe webhook secret is not configured")
 	}
 	timestamp, signatures, err := parseStripeSignature(signatureHeader)
@@ -41,7 +45,7 @@ func (c *Client) VerifyWebhook(payload []byte, signatureHeader string) error {
 		return ErrWebhookSignatureInFuture
 	}
 	signedPayload := fmt.Sprintf("%d.%s", timestamp, payload)
-	h := hmac.New(sha256.New, []byte(c.webhookSecret))
+	h := hmac.New(sha256.New, []byte(secret))
 	_, _ = h.Write([]byte(signedPayload))
 	expected := hex.EncodeToString(h.Sum(nil))
 	for _, sig := range signatures {
@@ -197,6 +201,9 @@ func (c *Client) getJSON(ctx context.Context, path string, out any) (json.RawMes
 		return nil, fmt.Errorf("create stripe request: %w", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	if c.accountID != "" {
+		req.Header.Set("Stripe-Account", c.accountID)
+	}
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {

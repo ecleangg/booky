@@ -13,7 +13,7 @@ import (
 )
 
 func TestNewRouterServesHealthWithJSONHeaders(t *testing.T) {
-	router := NewRouter(testutil.TestConfig(), nil, nil, nil, nil, discardLogger())
+	router := NewRouter(testutil.TestConfig(), nil, nil, nil, nil, nil, discardLogger())
 
 	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
 	rr := httptest.NewRecorder()
@@ -39,7 +39,7 @@ func TestNewRouterServesHealthWithJSONHeaders(t *testing.T) {
 }
 
 func TestNewRouterProtectsAdminRoute(t *testing.T) {
-	router := NewRouter(testutil.TestConfig(), nil, nil, nil, nil, discardLogger())
+	router := NewRouter(testutil.TestConfig(), nil, nil, nil, nil, nil, discardLogger())
 
 	req := httptest.NewRequest(http.MethodPost, "/admin/runs/daily-close", nil)
 	rr := httptest.NewRecorder()

@@ -21,7 +21,7 @@ import (
 func TestRunDailyCloseReturnsEarlyWithoutFacts(t *testing.T) {
 	repo, _ := testutil.NewTestRepository(t)
 	cfg := testutil.TestConfig()
-	service := NewService(cfg, repo, bokio.NewClient(cfg.Bokio), nil, pdf.NewGenerator(), accountingTestLogger())
+	service := NewService(cfg, repo, bokio.NewClient(cfg.Bokio), nil, pdf.NewGenerator(), nil, accountingTestLogger())
 
 	postingDate := time.Date(2026, 4, 2, 0, 0, 0, 0, time.UTC)
 	if err := service.RunDailyClose(context.Background(), postingDate); err != nil {
@@ -64,7 +64,7 @@ func TestRunDailyCloseCompletesPostingWorkflow(t *testing.T) {
 	defer server.Close()
 	cfg.Bokio.BaseURL = server.URL + "/v1"
 
-	service := NewService(cfg, repo, bokio.NewClient(cfg.Bokio), nil, pdf.NewGenerator(), accountingTestLogger())
+	service := NewService(cfg, repo, bokio.NewClient(cfg.Bokio), nil, pdf.NewGenerator(), nil, accountingTestLogger())
 	if err := repo.Queries().UpsertAccountingFacts(context.Background(), []domain.AccountingFact{
 		accountingFact(cfg.Bokio.CompanyID, "charge:ch_123:sale", "sale_receivable", 1580, domain.DirectionDebit, 11900, postingDate),
 		accountingFact(cfg.Bokio.CompanyID, "charge:ch_123:sale", "sale_revenue", 3001, domain.DirectionCredit, 11900, postingDate),

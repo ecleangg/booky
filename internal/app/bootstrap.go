@@ -13,6 +13,7 @@ import (
 	"github.com/ecleangg/booky/internal/config"
 	"github.com/ecleangg/booky/internal/filings"
 	"github.com/ecleangg/booky/internal/httpapi"
+	"github.com/ecleangg/booky/internal/integrations"
 	"github.com/ecleangg/booky/internal/jobs"
 	"github.com/ecleangg/booky/internal/notify"
 	"github.com/ecleangg/booky/internal/pdf"
@@ -57,16 +58,21 @@ func New(ctx context.Context, configPath string) (*App, error) {
 
 	stripeClient := stripe.NewClient(cfg.Stripe)
 	bokioClient := bokio.NewClient(cfg.Bokio)
+	integrationService, err := integrations.NewService(cfg, repo, logger)
+	if err != nil {
+		repo.Close()
+		return nil, err
+	}
 	var notifier notify.Notifier
 	if cfg.Notifications.Resend.Enabled {
 		notifier = notify.NewResendNotifier(cfg.Notifications.Resend)
 	}
 	pdfGenerator := pdf.NewGenerator()
 	taxService := tax.NewService(cfg, repo, logger)
-	accountingService := accounting.NewService(cfg, repo, bokioClient, notifier, pdfGenerator, logger)
-	filingsService := filings.NewService(cfg, repo, notifier, logger)
-	stripeService := stripe.NewService(cfg, repo, stripeClient, taxService, notifier, filingsService, logger)
-	router := httpapi.NewRouter(cfg, stripeService, accountingService, filingsService, bokioClient, logger)
+	accountingService := accounting.NewService(cfg, repo, bokioClient, notifier, pdfGenerator, integrationService, logger)
+	filingsService := filings.NewService(cfg, repo, notifier, integrationService, logger)
+	stripeService := stripe.NewService(cfg, repo, stripeClient, taxService, notifier, filingsService, integrationService, logger)
+	router := httpapi.NewRouter(cfg, stripeService, accountingService, filingsService, bokioClient, integrationService, logger)
 
 	server := &http.Server{
 		Addr:         cfg.HTTP.ListenAddr,
@@ -81,7 +87,7 @@ func New(ctx context.Context, configPath string) (*App, error) {
 		Logger:     logger,
 		Repo:       repo,
 		HTTPServer: server,
-		Scheduler:  jobs.NewScheduler(cfg, accountingService, filingsService, logger),
+		Scheduler:  jobs.NewScheduler(cfg, accountingService, filingsService, integrationService, logger),
 		Filings:    filingsService,
 	}, nil
 }

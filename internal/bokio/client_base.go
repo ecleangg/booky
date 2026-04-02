@@ -49,6 +49,15 @@ type CheckResult struct {
 	FiscalYears        bool      `json:"fiscal_years"`
 }
 
+type CompanyInformation struct {
+	Name string `json:"name"`
+}
+
+type ChartAccount struct {
+	Account int    `json:"account"`
+	Name    string `json:"name,omitempty"`
+}
+
 func NewClient(cfg config.BokioConfig) *Client {
 	return &Client{
 		baseURL:    strings.TrimRight(cfg.BaseURL, "/"),

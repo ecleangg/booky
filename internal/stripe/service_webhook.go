@@ -2,6 +2,7 @@ package stripe
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/ecleangg/booky/internal/domain"
@@ -18,7 +19,62 @@ func (s *Service) HandleWebhook(ctx context.Context, payload []byte, signatureHe
 	if err != nil {
 		return err
 	}
+	return s.handleEvent(ctx, evt, payload)
+}
 
+func (s *Service) HandleConnectWebhook(ctx context.Context, payload []byte, signatureHeader string) error {
+	if err := s.Client.VerifyWebhookWithSecret(payload, signatureHeader, s.Config.Stripe.ConnectWebhookSecret); err != nil {
+		return err
+	}
+
+	evt, err := s.Client.ParseEvent(payload)
+	if err != nil {
+		return err
+	}
+	if evt.Account == "" {
+		return fmt.Errorf("connect webhook event is missing account")
+	}
+	if evt.Type == "account.application.deauthorized" {
+		if err := s.handleConnectDeauthorized(ctx, evt); err != nil {
+			return err
+		}
+		return s.handleEvent(ctx, evt, payload)
+	}
+	if s.Tenants == nil {
+		return fmt.Errorf("tenant runtime is not configured")
+	}
+	runtime, err := s.Tenants.ResolveRuntimeByStripeAccount(ctx, evt.Account, evt.Livemode)
+	if err != nil {
+		return err
+	}
+	return s.withRuntime(runtime).handleEvent(ctx, evt, payload)
+}
+
+func (s *Service) handleConnectDeauthorized(ctx context.Context, evt Event) error {
+	conn, err := s.Repo.Queries().GetLatestStripeConnectionByAccount(ctx, evt.Account, evt.Livemode)
+	if err != nil {
+		if err == store.ErrNotFound {
+			return nil
+		}
+		return err
+	}
+	pairings, err := s.Repo.Queries().ListWorkspacePairingRecordsByWorkspace(ctx, conn.WorkspaceID)
+	if err != nil {
+		return err
+	}
+	return s.Repo.InTx(ctx, func(q *store.Queries) error {
+		for _, pairing := range pairings {
+			if pairing.StripeConnection.ID == conn.ID && pairing.Pairing.Status == domain.PairingStatusActive {
+				if err := q.DisconnectWorkspacePairing(ctx, pairing.Pairing.ID); err != nil {
+					return err
+				}
+			}
+		}
+		return q.DisconnectStripeConnection(ctx, conn.ID)
+	})
+}
+
+func (s *Service) handleEvent(ctx context.Context, evt Event, payload []byte) error {
 	inserted := false
 	eventRecord := domain.StripeWebhookEvent{
 		ID:              evt.ID,

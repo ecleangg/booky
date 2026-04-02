@@ -93,6 +93,14 @@ go run ./cmd/booky
 
 The service listens on port `8080` by default.
 
+For live reload during development, use the included Air config:
+
+```bash
+air
+```
+
+It rebuilds `./cmd/booky` and restarts the app whenever Go or YAML files change.
+
 ### 4. Check that it started
 
 ```bash

@@ -3,6 +3,7 @@ package filings
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"sort"
@@ -320,7 +321,7 @@ func loadChargeSupport(ctx context.Context, source entrySource, charge chargePay
 	var invoice *invoicePayload
 	if strings.TrimSpace(charge.Invoice) != "" {
 		raw, err := source.Snapshot(ctx, "invoice", strings.TrimSpace(charge.Invoice))
-		if err != nil && err != store.ErrNotFound {
+		if err != nil && !errors.Is(err, store.ErrNotFound) {
 			return nil, nil, err
 		}
 		if len(raw) > 0 {
@@ -339,7 +340,7 @@ func loadChargeSupport(ctx context.Context, source entrySource, charge chargePay
 	var customer *customerPayload
 	if customerID != "" {
 		raw, err := source.Snapshot(ctx, "customer", customerID)
-		if err != nil && err != store.ErrNotFound {
+		if err != nil && !errors.Is(err, store.ErrNotFound) {
 			return nil, nil, err
 		}
 		if len(raw) > 0 {

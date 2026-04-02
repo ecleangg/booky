@@ -14,13 +14,14 @@ func withBearerAuth(token string, next http.Handler) http.Handler {
 		}
 
 		authHeader := strings.TrimSpace(r.Header.Get("Authorization"))
-		if !strings.HasPrefix(authHeader, "Bearer ") {
+		scheme, provided, ok := strings.Cut(authHeader, " ")
+		if !ok || !strings.EqualFold(strings.TrimSpace(scheme), "Bearer") {
 			w.Header().Set("WWW-Authenticate", `Bearer realm="booky-admin"`)
 			writeError(w, http.StatusUnauthorized, nil)
 			return
 		}
 
-		provided := strings.TrimSpace(strings.TrimPrefix(authHeader, "Bearer "))
+		provided = strings.TrimSpace(provided)
 		if subtle.ConstantTimeCompare([]byte(token), []byte(provided)) != 1 {
 			w.Header().Set("WWW-Authenticate", `Bearer realm="booky-admin"`)
 			writeError(w, http.StatusUnauthorized, nil)

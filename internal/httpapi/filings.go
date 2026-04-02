@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -22,7 +23,7 @@ func filingStatusHandler(logger *slog.Logger, service *filings.Service) http.Han
 		}
 		status, err := service.GetStatus(r.Context(), kind, period)
 		if err != nil {
-			if err == store.ErrNotFound {
+			if errors.Is(err, store.ErrNotFound) {
 				writeError(w, http.StatusNotFound, err)
 				return
 			}

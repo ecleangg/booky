@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
+	"errors"
 	"encoding/hex"
 	"fmt"
 	"net/http"
@@ -30,6 +31,20 @@ func TestVerifyWebhookAcceptsFixturePayload(t *testing.T) {
 	}
 }
 
+func TestVerifyWebhookRejectsFutureTimestamp(t *testing.T) {
+	payload := testutil.LoadFixture(t, "stripe", "event_charge_succeeded.json")
+	client := NewClient(config.StripeConfig{
+		APIKey:        "sk_test",
+		WebhookSecret: "whsec_test",
+		APIBaseURL:    "https://api.stripe.test",
+	})
+
+	err := client.VerifyWebhook(payload, signedHeader(payload, "whsec_test", time.Now().Add(6*time.Minute).Unix()))
+	if !errors.Is(err, ErrWebhookSignatureInFuture) {
+		t.Fatalf("expected ErrWebhookSignatureInFuture, got %v", err)
+	}
+}
+
 func TestParseEventReadsFixturePayload(t *testing.T) {
 	payload := testutil.LoadFixture(t, "stripe", "event_charge_succeeded.json")
 	client := NewClient(config.StripeConfig{
@@ -50,6 +65,19 @@ func TestParseEventReadsFixturePayload(t *testing.T) {
 	}
 	if event.Account != "acct_123" {
 		t.Fatalf("unexpected account %q", event.Account)
+	}
+}
+
+func TestParseEventRejectsMissingIDOrType(t *testing.T) {
+	client := NewClient(config.StripeConfig{
+		APIKey:        "sk_test",
+		WebhookSecret: "whsec_test",
+		APIBaseURL:    "https://api.stripe.test",
+	})
+
+	_, err := client.ParseEvent([]byte(`{"id":"","type":"","data":{"object":{}}}`))
+	if !errors.Is(err, ErrInvalidEvent) {
+		t.Fatalf("expected ErrInvalidEvent, got %v", err)
 	}
 }
 

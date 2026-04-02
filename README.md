@@ -196,7 +196,7 @@ Admin endpoints require the configured bearer token when `admin.enabled` is turn
 `booky` can generate filing drafts for Skatteverket in the formats expected for:
 
 - OSS Union
-- Periodisk sammanstallning
+- Periodisk sammanställning
 
 When filings are enabled, `booky` prepares period-based export files from the stored Stripe accounting data and emails them to the recipients in `filings.email_to`.
 
@@ -208,7 +208,7 @@ The send timing is controlled by:
 In practice, that means:
 
 - OSS Union drafts are prepared for the quarter and aimed at the Skatteverket deadline at the end of the following month
-- Periodisk sammanstallning drafts are prepared per month and aimed at the Skatteverket deadline on the 25th of the following month
+- Periodisk sammanställning drafts are prepared per month and aimed at the Skatteverket deadline on the 25th of the following month
 
 Each draft email includes the generated file as an attachment. If there is no OSS-ready data for a period, `booky` can still send a nil-return reminder instead of a file so the team knows a filing may still be due.
 
